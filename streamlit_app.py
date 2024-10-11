@@ -1,4 +1,14 @@
 import streamlit as st
+from PIL import Image
+
+st.header("Aravally Split Calculator")
+hide_st_style="""
+<style>
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+header {visibility: hidden;}
+</style>
+"""
 # Load the image (replace 'image.jpg' with your file path)
 img = Image.open('Banner.jpg')
 
