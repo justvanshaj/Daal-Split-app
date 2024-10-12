@@ -1,6 +1,10 @@
 import streamlit as st
 from PIL import Image
-
+# Set the page configuration (title and favicon)
+st.set_page_config(
+    page_title="Aravally Split Calculator",  # Page title
+    page_icon="favicon.ico"  # Path to your favicon file
+)
 st.header("Aravally Split Calculator")
 hide_st_style="""
 <style>
