@@ -49,7 +49,6 @@ total_4_percent = j_percent + k_percent + l_percent + m_percent
 total_6_percent = total_dal_tukdi_percent + total_4_percent
 
 # Display results
-st.subheader("Grand Total")
 st.write(f"Grand Total: {g}")
 
 st.subheader("Details for Sheet")
