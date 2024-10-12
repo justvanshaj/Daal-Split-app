@@ -9,6 +9,8 @@ footer {visibility: hidden;}
 header {visibility: hidden;}
 </style>
 """
+
+st.markdown(hide_st_style, unsafe_allow_html=True)
 # Load the image (replace 'image.jpg' with your file path)
 img = Image.open('Banner.jpg')
 
