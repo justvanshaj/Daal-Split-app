@@ -22,7 +22,7 @@ st.markdown(hide_st_style, unsafe_allow_html=True)
 img = Image.open('Banner.jpg')
 
 # Display the image
-st.image(img, caption='', use_column_width=True)
+st.image(img, caption='', width=100)
 
 # Collecting additional details
 date = st.text_input("Enter Date:")
