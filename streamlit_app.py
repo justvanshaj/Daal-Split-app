@@ -2,8 +2,20 @@ import streamlit as st
 from fpdf import FPDF
 import base64
 
-# Set the page configuration
-st.set_page_config(page_title="Details Calculation", page_icon="📄")
+# Set the page configuration (title and favicon)
+st.set_page_config(
+    page_title="Aravally Dal Split",  # Page title
+    page_icon="favicon.ico"  # Path to your favicon file
+)
+st.header("Aravally Sieve Shaker Calculator")
+hide_st_style="""
+<style>
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+header {visibility: hidden;}
+</style>
+"""
+st.markdown(hide_st_style, unsafe_allow_html=True)
 
 st.header("Details Calculation in terms of 5gm")
 
