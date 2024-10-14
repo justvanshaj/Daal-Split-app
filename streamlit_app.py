@@ -18,24 +18,12 @@ header {visibility: hidden;}
 """
 st.markdown(hide_st_style, unsafe_allow_html=True)
 
-# Load the banner image
+# Load the image (replace 'image.jpg' with your file path)
 img = Image.open('Banner.jpg')
 
-# Display the image in the top-right corner using HTML and CSS
-st.markdown(
-    f"""
-    <style>
-    .banner {{
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        width: 150px;  /* Adjust width as needed */
-    }}
-    </style>
-    <img class="banner" src="data:image/png;base64,{base64.b64encode(img.tobytes()).decode()}">
-    """, 
-    unsafe_allow_html=True
-)
+# Display the image
+st.image(img, caption='', use_column_width=True)
+
 # Collecting additional details
 date = st.text_input("Enter Date:")
 vehicle_number = st.text_input("Enter Vehicle Number:")
