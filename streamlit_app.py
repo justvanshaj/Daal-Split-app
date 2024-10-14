@@ -91,6 +91,9 @@ def generate_pdf():
     pdf = FPDF()
     pdf.add_page()
 
+     # Add the image to the PDF (adjust size and position)
+    pdf.image('Banner.png', x=160, y=10, w=40)  # Adjust x, y, and width as needed
+    
     pdf.set_font("Arial", size=12)
     pdf.cell(200, 10, txt="Dal Split Report", ln=True, align='C')
     pdf.ln(10)  # Add a line space
