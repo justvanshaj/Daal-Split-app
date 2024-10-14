@@ -16,12 +16,12 @@ party_name = st.text_input("Enter Party Name:")
 gaadi_type = st.radio("Select Gaadi Type:", options=["Khadi", "Poori"])
 
 # Inputs for weights
-a = st.number_input("Enter Daal:", min_value=0.0, step=0.1)
-b = st.number_input("Enter Tukdi:", min_value=0.0, step=0.1)
-c = st.number_input("Enter Red/Black:", min_value=0.0, step=0.1)
-d = st.number_input("Enter Chhala:", min_value=0.0, step=0.1)
-e = st.number_input("Enter Dankhal:", min_value=0.0, step=0.1)
-f = st.number_input("Enter 14 Mesh:", min_value=0.0, step=0.1)
+a = st.number_input("Enter Daal:", min_value=0.000, step=0.001,format="%.3f")
+b = st.number_input("Enter Tukdi:", min_value=0.000, step=0.001,format="%.3f")
+c = st.number_input("Enter Red/Black:", min_value=0.000, step=0.001,format="%.3f")
+d = st.number_input("Enter Chhala:", min_value=0.000, step=0.001,format="%.3f")
+e = st.number_input("Enter Dankhal:", min_value=0.000, step=0.001,format="%.3f")
+f = st.number_input("Enter 14 Mesh:", min_value=0.000, step=0.001,format="%.3f")
 
 # Calculations
 g = a + b + c + d + e + f
