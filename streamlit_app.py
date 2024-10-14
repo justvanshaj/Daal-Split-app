@@ -1,6 +1,7 @@
 import streamlit as st
 from fpdf import FPDF
 import base64
+from PIL import Image
 
 # Set the page configuration (title and favicon)
 st.set_page_config(
