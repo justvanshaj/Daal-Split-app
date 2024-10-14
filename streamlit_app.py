@@ -1,21 +1,6 @@
 import streamlit as st
 from fpdf import FPDF
 import base64
-from PIL import Image
-
-# Set the page configuration (title and favicon)
-st.set_page_config(
-    page_title="Aravally Split Calculator",  # Page title
-    page_icon="favicon.ico"  # Path to your favicon file
-)
-st.header("Aravally Split Calculator")
-hide_st_style="""
-<style>
-#MainMenu {visibility: hidden;}
-footer {visibility: hidden;}
-header {visibility: hidden;}
-</style>
-"""
 
 # Set the page configuration
 st.set_page_config(page_title="Details Calculation", page_icon="📄")
