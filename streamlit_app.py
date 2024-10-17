@@ -5,11 +5,11 @@ from PIL import Image
 
 # Set the page configuration (title and favicon)
 st.set_page_config(
-    page_title="Aravally Dal Split",  # Page title
+    page_title="Dal Split Calculator",  # Page title
     page_icon="favicon.ico"  # Path to your favicon file
 )
 
-st.header("Aravally Dal Split Calculator")
+st.header("Aravally Dal Split")
 
 # Hide unnecessary Streamlit UI components
 hide_st_style = """
