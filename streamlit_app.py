@@ -10,7 +10,9 @@ st.set_page_config(
 )
 
 st.header("Aravally Dal Split Calculator")
-hide_st_style="""
+
+# Hide unnecessary Streamlit UI components
+hide_st_style = """
 <style>
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
@@ -21,8 +23,6 @@ st.markdown(hide_st_style, unsafe_allow_html=True)
 
 # Load the image (replace 'image.jpg' with your file path)
 img = Image.open('Banner.png')
-
-# Display the image
 st.image(img, caption='', width=100)
 
 # Collecting additional details
@@ -33,34 +33,34 @@ party_name = st.text_input("Enter Party Name:")
 # Radio button for Gaadi Type
 gaadi_type = st.radio("Select Gaadi Type:", options=["Khadi", "Poori"])
 
-# Inputs for weights
-a = st.number_input("Enter Daal:", min_value=0.000, step=0.001,format="%.3f")
-b = st.number_input("Enter Tukdi:", min_value=0.000, step=0.001,format="%.3f")
-c = st.number_input("Enter Red/Black:", min_value=0.000, step=0.001,format="%.3f")
-d = st.number_input("Enter Chhala:", min_value=0.000, step=0.001,format="%.3f")
-e = st.number_input("Enter Dankhal:", min_value=0.000, step=0.001,format="%.3f")
-f = st.number_input("Enter 14 Mesh:", min_value=0.000, step=0.001,format="%.3f")
+# Inputs for weights (with three decimal precision)
+a = st.number_input("Enter Daal:", min_value=0.000, step=0.001, format="%.3f")
+b = st.number_input("Enter Tukdi:", min_value=0.000, step=0.001, format="%.3f")
+c = st.number_input("Enter Red/Black:", min_value=0.000, step=0.001, format="%.3f")
+d = st.number_input("Enter Chhala:", min_value=0.000, step=0.001, format="%.3f")
+e = st.number_input("Enter Dankhal:", min_value=0.000, step=0.001, format="%.3f")
+f = st.number_input("Enter 14 Mesh:", min_value=0.000, step=0.001, format="%.3f")
 
-# Calculations
-g = a + b + c + d + e + f
-h = a * 2
-i = b * 2
-j = c * 2
-k = d * 2
-l = e * 2
-m = f * 2
-grand_total = h + i + j + k + l + m
+# Calculations (rounded to 3 decimal points)
+g = round(a + b + c + d + e + f, 3)
+h = round(a * 2, 3)
+i = round(b * 2, 3)
+j = round(c * 2, 3)
+k = round(d * 2, 3)
+l = round(e * 2, 3)
+m = round(f * 2, 3)
+grand_total = round(h + i + j + k + l + m, 3)
 
-# Percentage calculations
-h_percent = h * 10
-i_percent = i * 10
-total_dal_tukdi_percent = h_percent + i_percent
-j_percent = j * 10
-k_percent = k * 10
-l_percent = l * 10
-m_percent = m * 10
-total_4_percent = j_percent + k_percent + l_percent + m_percent
-total_6_percent = total_dal_tukdi_percent + total_4_percent
+# Percentage calculations (rounded to 3 decimal points)
+h_percent = round(h * 10, 3)
+i_percent = round(i * 10, 3)
+total_dal_tukdi_percent = round(h_percent + i_percent, 3)
+j_percent = round(j * 10, 3)
+k_percent = round(k * 10, 3)
+l_percent = round(l * 10, 3)
+m_percent = round(m * 10, 3)
+total_4_percent = round(j_percent + k_percent + l_percent + m_percent, 3)
+total_6_percent = round(total_dal_tukdi_percent + total_4_percent, 3)
 
 # Display results
 st.subheader("Grand Total")
@@ -86,23 +86,23 @@ st.write(f"14 Mesh: {m_percent}%")
 st.write(f"Total (4): {total_4_percent}%")
 st.write(f"Total (6): {total_6_percent}%")
 
-# Generate PDF content
+# Generate PDF content with rounded values
 def generate_pdf():
     pdf = FPDF()
     pdf.add_page()
 
-     # Add the image to the PDF (adjust size and position)
+    # Add the image to the PDF (adjust size and position)
     pdf.image('Banner.png', x=160, y=10, w=40)  # Adjust x, y, and width as needed
     
     pdf.set_font("Arial", size=12)
     pdf.cell(200, 10, txt="Dal Split Report", ln=True, align='C')
-    pdf.ln(10)  # Add a line space
+    pdf.ln(10)
 
     pdf.cell(200, 10, txt=f"Date: {date}", ln=True)
     pdf.cell(200, 10, txt=f"Vehicle Number: {vehicle_number}", ln=True)
     pdf.cell(200, 10, txt=f"Party Name: {party_name}", ln=True)
     pdf.cell(200, 10, txt=f"Gaadi Type: {gaadi_type}", ln=True)
-    pdf.ln(10)  # Add a line space
+    pdf.ln(10)
 
     pdf.cell(200, 10, txt="Details (in grams):", ln=True)
     pdf.cell(200, 10, txt=f"Daal: {h}gm", ln=True)
@@ -125,7 +125,6 @@ def generate_pdf():
     pdf.cell(200, 10, txt=f"Total (4): {total_4_percent}%", ln=True)
     pdf.cell(200, 10, txt=f"Total (6): {total_6_percent}%", ln=True)
 
-    # Save the PDF to a temporary file
     pdf_file = "dal_split_report.pdf"
     pdf.output(pdf_file)
     return pdf_file
