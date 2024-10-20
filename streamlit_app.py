@@ -6,7 +6,7 @@ from PIL import Image
 # Set the page configuration (title and favicon)
 st.set_page_config(
     page_title="Aravally Dal Split",  # Page title
-    page_icon="favicon.ico"  # Path to your favicon file
+    page_icon="favicon_split.ico"  # Path to your favicon file
 )
 
 st.header("Dal Split Calculator")
