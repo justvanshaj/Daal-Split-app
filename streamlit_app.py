@@ -83,23 +83,38 @@ st.write(f"14 Mesh: {m_percent}%")
 st.write(f"Total (4): {total_4_percent}%")
 st.write(f"Total (6): {total_6_percent}%")
 
-# Capture image from camera input
+# Capture image from camera input or upload
 camera_image = st.camera_input("Take a picture")
+uploaded_image = st.file_uploader("Or upload an image", type=["jpg", "jpeg", "png"])
 
 # Function to generate PDF with image
-def generate_pdf(camera_image):
+def generate_pdf(camera_image, uploaded_image):
     pdf = FPDF()
+
+    # Add first page with the camera image if available
+    if camera_image is not None:
+        try:
+            # Convert the camera image (bytes) to an image object
+            img = Image.open(io.BytesIO(camera_image))  # Use the BytesIO buffer directly
+            img_path = "camera_image.jpg"  # Temporary file path to save image
+            img.save(img_path)  # Save to a temporary file
+
+            pdf.add_page()
+            pdf.image(img_path, x=10, y=10, w=180)  # Adjust coordinates and size
+        except Exception as e:
+            st.error(f"Error processing the camera image: {e}")
+    elif uploaded_image is not None:
+        try:
+            # Convert the uploaded image (bytes) to an image object
+            img = Image.open(uploaded_image)  # Open the uploaded image file
+            img_path = "uploaded_image.jpg"  # Temporary file path to save image
+            img.save(img_path)  # Save to a temporary file
+
+            pdf.add_page()
+            pdf.image(img_path, x=10, y=10, w=180)  # Adjust coordinates and size
+        except Exception as e:
+            st.error(f"Error processing the uploaded image: {e}")
     
-    # Add first page with the camera image
-    if camera_image:
-        # Convert the camera image (bytes) to an image object
-        img = Image.open(io.BytesIO(camera_image))  # Use the BytesIO buffer directly
-        img_path = "camera_image.jpg"  # Temporary file path to save image
-        img.save(img_path)  # Save to a temporary file
-
-        pdf.add_page()
-        pdf.image(img_path, x=10, y=10, w=180)  # Adjust coordinates and size
-
     # Add the second page with the report
     pdf.add_page()
 
@@ -150,8 +165,8 @@ def pdf_download_link(pdf_file):
 
 # Generate and provide the download link
 if st.button("Generate PDF"):
-    if camera_image:
-        pdf_file = generate_pdf(camera_image)
+    if camera_image is not None or uploaded_image is not None:
+        pdf_file = generate_pdf(camera_image, uploaded_image)
         st.markdown(pdf_download_link(pdf_file), unsafe_allow_html=True)
     else:
-        st.warning("Please capture an image first.")
+        st.warning("Please capture or upload an image first.")
