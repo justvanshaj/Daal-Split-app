@@ -92,9 +92,11 @@ def generate_pdf(camera_image):
     
     # Add first page with the camera image
     if camera_image:
-        img = Image.open(io.BytesIO(camera_image))  # Convert camera image to PIL Image
+        # Convert the camera image (bytes) to an image object
+        img = Image.open(io.BytesIO(camera_image))  # Use the BytesIO buffer directly
         img_path = "camera_image.jpg"  # Temporary file path to save image
-        img.save(img_path)  # Save to a file
+        img.save(img_path)  # Save to a temporary file
+
         pdf.add_page()
         pdf.image(img_path, x=10, y=10, w=180)  # Adjust coordinates and size
 
