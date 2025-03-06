@@ -139,7 +139,7 @@ def generate_pdf(uploaded_image):
     pdf.cell(200, 10, txt=f"Total (6): {total_6_percent}%", ln=True)
 
     # Create a custom file name for the PDF (using date, vehicle number, etc.)
-    pdf_file_name = f"{date}_{vehicle_number}_{party_name}_{gaadi_type}_dal_split_report.pdf"
+    pdf_file_name = f"{date}_{vehicle_number}_{party_name}_{gaadi_type}_gaadi.pdf"
     pdf.output(pdf_file_name)
     return pdf_file_name
 
