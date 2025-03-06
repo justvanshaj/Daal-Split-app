@@ -1,14 +1,13 @@
 import streamlit as st
 from fpdf import FPDF
-import base64
 from PIL import Image
-from datetime import datetime
 import io
+import base64
 
 # Set the page configuration (title and favicon)
 st.set_page_config(
-    page_title="Aravally Dal Split",  # Page title
-    page_icon="favicon_split.ico"  # Path to your favicon file
+    page_title="Aravally Dal Split",
+    page_icon="favicon_split.ico"
 )
 
 st.header("Dal Split Calculator")
@@ -23,12 +22,8 @@ header {visibility: hidden;}
 """
 st.markdown(hide_st_style, unsafe_allow_html=True)
 
-# Load the image (replace 'Banner.png' with your file path)
-img = Image.open('Banner.png')
-st.image(img, caption='', width=100)
-
-# Collecting additional details
-date = st.date_input("Enter Date:", value=datetime.today())
+# Collecting details
+date = st.text_input("Enter Date:", value="2025-03-06")  # Default today's date
 vehicle_number = st.text_input("Enter Vehicle Number:")
 party_name = st.text_input("Enter Party Name:")
 
@@ -43,7 +38,7 @@ d = st.number_input("Enter Chhala:", min_value=0.000, step=0.001, format="%.3f")
 e = st.number_input("Enter Dankhal:", min_value=0.000, step=0.001, format="%.3f")
 f = st.number_input("Enter 14 Mesh:", min_value=0.000, step=0.001, format="%.3f")
 
-# Calculations (rounded to 3 decimal points)
+# Calculate totals
 g = round(a + b + c + d + e + f, 3)
 h = round(a * 2, 3)
 i = round(b * 2, 3)
@@ -53,7 +48,7 @@ l = round(e * 2, 3)
 m = round(f * 2, 3)
 grand_total = round(h + i + j + k + l + m, 3)
 
-# Percentage calculations (rounded to 3 decimal points)
+# Percentage calculations
 h_percent = round(h * 10, 3)
 i_percent = round(i * 10, 3)
 total_dal_tukdi_percent = round(h_percent + i_percent, 3)
@@ -88,31 +83,25 @@ st.write(f"14 Mesh: {m_percent}%")
 st.write(f"Total (4): {total_4_percent}%")
 st.write(f"Total (6): {total_6_percent}%")
 
-# Capture image from the camera
+# Capture image from camera input
 camera_image = st.camera_input("Take a picture")
 
-# Function to generate PDF
+# Function to generate PDF with image
 def generate_pdf(camera_image):
     pdf = FPDF()
     
-    # If the camera image is captured, save it to a page
-    if camera_image is not None:
-        # Convert the image to a format that FPDF can work with
-        img = Image.open(io.BytesIO(camera_image))
-        img_path = "captured_image.jpg"
-        img.save(img_path)  # Save the image to a file
-
-        # Add first page with the captured image
+    # Add first page with the camera image
+    if camera_image:
+        img = Image.open(io.BytesIO(camera_image))  # Convert camera image to PIL Image
+        img_path = "camera_image.jpg"  # Temporary file path to save image
+        img.save(img_path)  # Save to a file
         pdf.add_page()
-        pdf.image(img_path, x=10, y=10, w=180)  # Adjust the size of the image
+        pdf.image(img_path, x=10, y=10, w=180)  # Adjust coordinates and size
 
-        # Add second page with the report content
-        pdf.add_page()
+    # Add the second page with the report
+    pdf.add_page()
 
-    else:
-        # If no image, just start with a blank first page
-        pdf.add_page()
-
+    # Add the report details to PDF
     pdf.set_font("Arial", size=12)
     pdf.cell(200, 10, txt="Dal Split Report", ln=True, align='C')
     pdf.ln(10)
@@ -144,13 +133,12 @@ def generate_pdf(camera_image):
     pdf.cell(200, 10, txt=f"Total (4): {total_4_percent}%", ln=True)
     pdf.cell(200, 10, txt=f"Total (6): {total_6_percent}%", ln=True)
 
-    # Custom PDF file name
-    pdf_file_name = f"{date.strftime('%Y-%m-%d')}_{vehicle_number}_{party_name}_{gaadi_type}.pdf"
-
+    # Create a custom file name for the PDF (using date, vehicle number, etc.)
+    pdf_file_name = f"{date}_{vehicle_number}_{party_name}_{gaadi_type}_dal_split_report.pdf"
     pdf.output(pdf_file_name)
     return pdf_file_name
 
-# Function to create a download link
+# Function to generate download link for the PDF
 def pdf_download_link(pdf_file):
     with open(pdf_file, "rb") as f:
         pdf_data = f.read()
@@ -158,10 +146,10 @@ def pdf_download_link(pdf_file):
     href = f'<a href="data:application/octet-stream;base64,{b64}" download="{pdf_file}">📥 Download PDF</a>'
     return href
 
-# Display the PDF download button
+# Generate and provide the download link
 if st.button("Generate PDF"):
-    if camera_image is not None:
+    if camera_image:
         pdf_file = generate_pdf(camera_image)
         st.markdown(pdf_download_link(pdf_file), unsafe_allow_html=True)
     else:
-        st.warning("Please take a picture to generate the PDF.")
+        st.warning("Please capture an image first.")
