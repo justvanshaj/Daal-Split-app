@@ -6,6 +6,8 @@ import io
 import datetime
 import unicodedata
 import re
+import tempfile
+import os
 
 # ---------- Config ----------
 st.set_page_config(page_title="Aravally Dal Split", page_icon="favicon_split.ico")
@@ -46,10 +48,9 @@ f = st.number_input("14 Mesh (input)", min_value=0.000, step=0.001, format="%.3f
 uploaded_file = st.file_uploader("Upload an image (jpg, jpeg, png) — this will be page 1 of the PDF", type=["jpg", "jpeg", "png"])
 
 # ---------- Calculations ----------
-# Input sum
 g_sum_inputs = round(a + b + c + d + e + f, 3)
 
-# Sheet grams (original logic: *2)
+# Sheet grams (your original logic)
 h = round(a * 2, 3)  # Daal (sheet grams)
 i = round(b * 2, 3)  # Tukdi
 j = round(c * 2, 3)
@@ -102,30 +103,22 @@ def render_results_table():
 
 render_results_table()
 
-# ---------- Image resizing settings ----------
-# Adjust these if you want smaller or better quality images
+# ---------- Image resize/compress settings ----------
 MAX_WIDTH = 1200          # maximum width in pixels after resize (helps avoid OOM)
 MAX_HEIGHT = 1600         # max height (preserve aspect ratio)
 JPEG_QUALITY = 70         # 0-100 (lower -> smaller file)
 
 def resize_and_compress_image(pil_img, max_w=MAX_WIDTH, max_h=MAX_HEIGHT, quality=JPEG_QUALITY):
-    """
-    Resize image to fit within max_w x max_h while preserving aspect ratio,
-    then save to an in-memory JPEG buffer with given quality.
-    Returns BytesIO buffer ready for FPDF.
-    """
     img = pil_img.copy()
-    # Convert to RGB if needed
     if img.mode not in ("RGB", "L"):
         img = img.convert("RGB")
-    # Resize preserving aspect ratio (thumbnail modifies in place)
     img.thumbnail((max_w, max_h), Image.LANCZOS)
     buf = io.BytesIO()
     img.save(buf, format="JPEG", quality=quality, optimize=True)
     buf.seek(0)
     return buf
 
-# ---------- PDF generation ----------
+# ---------- PDF generation (uses temp file for image) ----------
 def slugify(value):
     value = str(value or "")
     value = unicodedata.normalize('NFKD', value).encode('ascii', 'ignore').decode('ascii')
@@ -134,20 +127,34 @@ def slugify(value):
 
 def generate_pdf_bytes(uploaded_img_file, data):
     pdf = FPDF(format='A4')
+
     # --- Page 1: image (landscape) ---
     if uploaded_img_file is not None:
+        temp_path = None
         try:
             pil_img = Image.open(uploaded_img_file)
             img_buf = resize_and_compress_image(pil_img)
+
+            # Save to a temporary file so FPDF can read it
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmpfile:
+                tmpfile.write(img_buf.read())
+                tmpfile.flush()
+                temp_path = tmpfile.name
+
             pdf.add_page(orientation='L')
-            # Fit into page width with margin
             page_w = pdf.w - 20
-            pdf.image(img_buf, x=10, y=10, w=page_w)
+            pdf.image(temp_path, x=10, y=10, w=page_w)
+
         except Exception as e:
-            # If something fails with image, still create a page with message
             pdf.add_page(orientation='L')
             pdf.set_font("Arial", "B", 16)
             pdf.cell(0, 10, f"Image error: {e}", ln=True, align='C')
+        finally:
+            if temp_path and os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except Exception:
+                    pass
     else:
         pdf.add_page(orientation='L')
         pdf.set_font("Arial", "B", 16)
@@ -227,7 +234,7 @@ def generate_pdf_bytes(uploaded_img_file, data):
         pdf.multi_cell(right_col_w - 4, 4, right_text)
         current_y += h
 
-    # Rows in required order
+    # Rows in specified order
     row_two_columns(f"DAAL : {data['DAAL']} gm", f"DAAL : {data['DAAL_PERC']} %")
     row_two_columns(f"TUKDI : {data['TUKDI']} gm", f"TUKDI : {data['TUKDI_PERC']} %")
     row_two_columns(f"TOTAL ( DAAL + TUKDI ) : {data['TOTAL_DTG']} gm", f"TOTAL ( DAAL + TUKDI ) : {data['TOTAL_DTP']} %", bold=True)
@@ -238,7 +245,7 @@ def generate_pdf_bytes(uploaded_img_file, data):
     row_two_columns(f"TOTAL ( R/B + C + D + 14# ) : {data['TOTAL_4_GRAMS']} gm", f"TOTAL ( R/B + C + D + 14# ) : {data['TOTAL_4']} %", bold=True)
     row_two_columns(f"GRAND TOTAL : {data['GRAND_TOTAL']} gm", f"GRAND TOTAL : {data['TOTAL_6']} %", bold=True)
 
-    # Outer border around the table
+    # Outer border around the whole table
     pdf.rect(table_x, table_y, left_col_w + right_col_w, current_y - table_y)
 
     return pdf.output(dest='S').encode('latin-1')
@@ -278,5 +285,4 @@ if st.button("Generate PDF"):
         st.download_button("📥 Download PDF", data=pdf_bytes, file_name=safe_name, mime="application/pdf")
     except Exception as ex:
         st.error(f"Failed to generate PDF: {ex}")
-        # helpful debugging hint
-        st.write("Try uploading a smaller image or run the app on a desktop/server if mobile memory is low.")
+        st.write("If you are on mobile and still see memory errors, reduce image size before upload or deploy the app to a server so generation happens server-side.")
