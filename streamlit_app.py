@@ -5,31 +5,35 @@ import io
 import re
 import unicodedata
 import datetime
+import logging
 
-# ---------- PAGE CONFIG ----------
+# ---------- Config ----------
 st.set_page_config(page_title="Aravally Dal Split", page_icon="favicon_split.ico")
 st.header("Dal Split Calculator")
 
-# Hide Streamlit UI chrome
 st.markdown("""
 <style>
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
 header {visibility: hidden;}
+/* Table styling for results */
+.result-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+.result-table th, .result-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+.result-table th { background-color: #f2f2f2; font-weight:600; }
+@media (max-width: 480px) {
+  .result-table td, .result-table th { font-size: 14px; padding: 6px; }
+}
 </style>
 """, unsafe_allow_html=True)
 
-# ---------- DATE INPUT (calendar) ----------
-# Use user's timezone context from your deployment; here we default to current day as required.
-# Per instructions the "current date" is 2025-10-13, so default_date is set explicitly to that day.
-default_date = datetime.date(2025, 10, 13)  # YYYY, M, D
-selected_date = st.date_input("Select Date (DD/MM/YYYY)", value=default_date)
-# Format for display in template: DD/MM/YYYY
+logger = logging.getLogger(__name__)
+
+# ---------- DATE INPUT ----------
+selected_date = st.date_input("Select Date (DD/MM/YYYY)", value=datetime.date.today())
 display_date = selected_date.strftime("%d/%m/%Y")
-# Filename-safe date (YYYY-MM-DD)
 filename_date = selected_date.strftime("%Y-%m-%d")
 
-# ---------- INPUTS ----------
+# ---------- INPUT FIELDS ----------
 vehicle_number = st.text_input("Enter Vehicle Number:")
 party_name = st.text_input("Enter Party Name:")
 gaadi_type = st.radio("Select Gaadi Type:", options=["Khadi", "Poori"])
@@ -42,29 +46,21 @@ d = st.number_input("Chhala (input)", min_value=0.000, step=0.001, format="%.3f"
 e = st.number_input("Dankhal (input)", min_value=0.000, step=0.001, format="%.3f")
 f = st.number_input("14 Mesh (input)", min_value=0.000, step=0.001, format="%.3f")
 
-# Image input (camera or upload)
-col_img1, col_img2 = st.columns(2)
-with col_img1:
-    try:
-        camera_img = st.camera_input("Capture image (camera)")
-    except Exception:
-        camera_img = None
-with col_img2:
-    uploaded_file = st.file_uploader("Or upload an image", type=["jpg", "jpeg", "png"])
-
-image_file = camera_img if camera_img is not None else uploaded_file
+# ---------- IMAGE UPLOADER (camera removed) ----------
+uploaded_file = st.file_uploader("Upload an image (jpg, jpeg, png) — this will be page 1 of the PDF", type=["jpg", "jpeg", "png"])
+image_file = uploaded_file  # only uploader used
 
 # ---------- CALCULATIONS ----------
 g = round(a + b + c + d + e + f, 3)
-h = round(a * 2, 3)  # Daal (sheet grams)
-i = round(b * 2, 3)  # Tukdi
-j = round(c * 2, 3)  # Red/Black
-k = round(d * 2, 3)  # Chhala
-l = round(e * 2, 3)  # Dankhal
-m = round(f * 2, 3)  # 14 Mesh
+h = round(a * 2, 3)  # Daal grams for sheet
+i = round(b * 2, 3)  # Tukdi grams for sheet
+j = round(c * 2, 3)
+k = round(d * 2, 3)
+l = round(e * 2, 3)
+m = round(f * 2, 3)
 grand_total = round(h + i + j + k + l + m, 3)
 
-# Percentages (kept original behavior)
+# Percents (original behavior preserved)
 h_percent = round(h * 10, 3)
 i_percent = round(i * 10, 3)
 j_percent = round(j * 10, 3)
@@ -72,65 +68,73 @@ k_percent = round(k * 10, 3)
 l_percent = round(l * 10, 3)
 m_percent = round(m * 10, 3)
 
-# Totals (percent)
 total_dal_tukdi_percent = round(h_percent + i_percent, 3)
 total_4_percent = round(j_percent + k_percent + l_percent + m_percent, 3)
 total_6_percent = round(total_dal_tukdi_percent + total_4_percent, 3)
 
-# Totals (grams) — as requested
+# NEW grams totals requested
 total_dal_tukdi_grams = round(h + i, 3)
 total_4_grams = round(j + k + l + m, 3)
 
-# ---------- DISPLAY (grams & percent side-by-side) ----------
+# ---------- RESPONSIVE HTML TABLE DISPLAY (keeps rows intact on mobile) ----------
+def render_results_table():
+    html = f"""
+    <table class="result-table">
+      <thead>
+        <tr><th>Item</th><th>Grams</th><th>Percentage</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Daal</td><td>{h} g</td><td>{h_percent} %</td></tr>
+        <tr><td>Tukdi</td><td>{i} g</td><td>{i_percent} %</td></tr>
+        <tr style="font-weight:700;"><td>Total (Dal + Tukdi)</td><td>{total_dal_tukdi_grams} g</td><td>{total_dal_tukdi_percent} %</td></tr>
+        <tr><td>Red/Black</td><td>{j} g</td><td>{j_percent} %</td></tr>
+        <tr><td>Chhala</td><td>{k} g</td><td>{k_percent} %</td></tr>
+        <tr><td>Dankhal</td><td>{l} g</td><td>{l_percent} %</td></tr>
+        <tr><td>14 Mesh</td><td>{m} g</td><td>{m_percent} %</td></tr>
+        <tr style="font-weight:700;"><td>Total (4)</td><td>{total_4_grams} g</td><td>{total_4_percent} %</td></tr>
+        <tr style="font-weight:700;"><td>Grand Total for Sheet</td><td>{grand_total} g</td><td>{total_6_percent} %</td></tr>
+      </tbody>
+    </table>
+    """
+    st.markdown(html, unsafe_allow_html=True)
+
 st.subheader("Grand Total")
 st.write(f"Grand Total (sum of raw inputs): **{g} g**")
+st.subheader("Details — grams and percentage (rows keep aligned on mobile)")
+render_results_table()
 
-st.subheader("Details — grams and percentage")
-
-def row_display(label, grams, percent):
-    c1, c2, c3 = st.columns([2.5, 2, 2])
-    c1.write(f"**{label}**")
-    c2.write(f"{grams} g")
-    c3.write(f"{percent} %")
-
-# Daal
-row_display("Daal", h, h_percent)
-# Tukdi
-row_display("Tukdi", i, i_percent)
-# Total (Dal + Tukdi) right after Tukdi
-st.markdown("**Total (Dal + Tukdi)**")
-row_display("Total (Dal + Tukdi)", total_dal_tukdi_grams, total_dal_tukdi_percent)
-st.markdown("---")
-
-# Remaining items
-row_display("Red/Black", j, j_percent)
-row_display("Chhala", k, k_percent)
-row_display("Dankhal", l, l_percent)
-row_display("14 Mesh", m, m_percent)
-
-# Total (4) right after 14 Mesh
-st.markdown("**Total (4)**")
-row_display("Total (4)", total_4_grams, total_4_percent)
-st.markdown("---")
-
-# Grand Total row
-row_display("Grand Total for Sheet", grand_total, total_6_percent)
-
-# ---------- TEMPLATE (from repo) ----------
-TEMPLATE_PATH = "report_template.docx"
-
-def load_template(path=TEMPLATE_PATH):
+# ---------- Robust template loader to avoid UnicodeDecodeError ----------
+def load_template(path="report_template.txt"):
+    candidates = ["utf-8-sig", "utf-8", "utf-16", "latin-1", "cp1252"]
+    for enc in candidates:
+        try:
+            with open(path, "r", encoding=enc) as fh:
+                text = fh.read()
+            return text, enc
+        except FileNotFoundError:
+            return None, None
+        except Exception as e:
+            logger.debug(f"Failed to read {path} with {enc}: {e}")
+            continue
+    # Fallback binary decode with replacement
     try:
-        with open(path, "r", encoding="utf-8") as fh:
-            return fh.read()
+        with open(path, "rb") as fh:
+            raw = fh.read()
+        text = raw.decode("utf-8", errors="replace")
+        return text, "fallback-utf8-replace"
     except FileNotFoundError:
-        return None
+        return None, None
+    except Exception as e:
+        logger.error(f"Failed binary fallback reading template: {e}")
+        return None, None
 
-template_text = load_template()
+template_text, template_encoding = load_template()
 if template_text is None:
-    st.warning(f"Template file '{TEMPLATE_PATH}' not found in repo root. Add it and use placeholders as shown below.")
+    st.warning("Template file 'report_template.txt' not found in the repo root. Add it and use placeholders exactly as shown in the example.")
+else:
+    st.info(f"Loaded template (encoding: {template_encoding})")
 
-# ---------- PDF GENERATION ----------
+# ---------- PDF generation ----------
 def slugify(value):
     value = str(value)
     value = unicodedata.normalize('NFKD', value).encode('ascii', 'ignore').decode('ascii')
@@ -139,8 +143,7 @@ def slugify(value):
 
 def generate_pdf_bytes(image_file, template_text, data_map):
     pdf = FPDF()
-
-    # First page: image (landscape)
+    # First page: uploaded image (landscape)
     if image_file is not None:
         try:
             img = Image.open(image_file)
@@ -149,31 +152,30 @@ def generate_pdf_bytes(image_file, template_text, data_map):
             img_buffer.seek(0)
             pdf.add_page(orientation='L')
             pdf.image(img_buffer, x=10, y=10, w=270)
-        except Exception as e:
+        except Exception as ex:
             pdf.add_page(orientation='L')
             pdf.set_font("Arial", "B", 16)
-            pdf.cell(0, 10, f"Image error: {e}", ln=True, align='C')
+            pdf.cell(0, 10, f"Image processing error: {ex}", ln=True, align='C')
     else:
         pdf.add_page(orientation='L')
         pdf.set_font("Arial", "B", 16)
         pdf.cell(0, 10, "No Image Provided", ln=True, align='C')
 
-    # Second page: template (portrait)
+    # Second page: filled template (portrait)
     pdf.add_page(orientation='P')
-    pdf.set_font("Arial", size=12)
     pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.set_font("Arial", size=12)
 
     if template_text:
         filled = template_text
         for key, val in data_map.items():
             filled = filled.replace("{" + key + "}", str(val))
-        for line in filled.splitlines():
-            pdf.multi_cell(0, 8, line)
+        for paragraph in filled.splitlines():
+            pdf.multi_cell(0, 8, paragraph)
     else:
-        # Fallback body if template missing
+        # fallback report content if template missing
         lines = [
             "Dal Split Report",
-            "",
             f"Date: {data_map['DATE']}",
             f"Vehicle Number: {data_map['VEHICLE']}",
             f"Party Name: {data_map['PARTY']}",
@@ -207,7 +209,7 @@ def generate_pdf_bytes(image_file, template_text, data_map):
     pdf_bytes = pdf.output(dest='S').encode('latin-1')
     return pdf_bytes
 
-# ---------- DATA MAP with new DATE format and placeholder names ----------
+# ---------- Data map (placeholders) ----------
 data_map = {
     "DATE": display_date,                   # DD/MM/YYYY for template
     "VEHICLE": vehicle_number,
@@ -215,8 +217,8 @@ data_map = {
     "GAADI": gaadi_type,
     "DAAL": h,
     "TUKDI": i,
-    "TOTAL_DTG": total_dal_tukdi_grams,     # your chosen placeholder for grams
-    "TOTAL_DTP": total_dal_tukdi_percent,   # your chosen placeholder for percent
+    "TOTAL_DTG": total_dal_tukdi_grams,     # your renamed placeholder for grams
+    "TOTAL_DTP": total_dal_tukdi_percent,   # your renamed placeholder for percent
     "REDBLACK": j,
     "CHHALA": k,
     "DANKHAL": l,
@@ -233,10 +235,9 @@ data_map = {
     "MES14_PERC": m_percent
 }
 
-# ---------- GENERATE + DOWNLOAD BUTTON ----------
+# ---------- Generate + Download ----------
 if st.button("Generate PDF"):
     pdf_bytes = generate_pdf_bytes(image_file, template_text, data_map)
-    # filename uses safe date format (YYYY-MM-DD)
     fname = f"{filename_date}_{slugify(vehicle_number)}_{slugify(party_name)}_{slugify(gaadi_type)}_gaadi.pdf"
     st.success("PDF generated — click to download")
     st.download_button(label="📥 Download PDF", data=pdf_bytes, file_name=fname, mime="application/pdf")
