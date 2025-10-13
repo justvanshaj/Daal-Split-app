@@ -1,15 +1,13 @@
-# app.py
+# app.py (final, robust)
 import streamlit as st
 from fpdf import FPDF
-from PIL import Image
-import io
-import datetime
-import unicodedata
-import re
-import tempfile
-import os
+from PIL import Image, ImageFile
+import io, os, tempfile, unicodedata, re, datetime
 
-# ---------- Config ----------
+# allow PIL to load truncated images sometimes
+ImageFile.LOAD_TRUNCATED_IMAGES = True
+
+# ---------- CONFIG ----------
 st.set_page_config(page_title="Aravally Dal Split", page_icon="favicon_split.ico")
 st.title("Aravally Dal Split")
 
@@ -21,13 +19,10 @@ header {visibility: hidden;}
 .result-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
 .result-table th, .result-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
 .result-table th { background-color: #f2f2f2; font-weight:600; }
-@media (max-width: 480px) {
-  .result-table td, .result-table th { font-size: 14px; padding: 6px; }
-}
 </style>
 """, unsafe_allow_html=True)
 
-# ---------- Inputs ----------
+# ---------- INPUTS ----------
 selected_date = st.date_input("Select Date (DD/MM/YYYY)", value=datetime.date.today())
 display_date = selected_date.strftime("%d/%m/%Y")
 filename_date = selected_date.strftime("%Y-%m-%d")
@@ -44,24 +39,16 @@ d = st.number_input("Chhala (input)", min_value=0.000, step=0.001, format="%.3f"
 e = st.number_input("Dankhal (input)", min_value=0.000, step=0.001, format="%.3f")
 f = st.number_input("14 Mesh (input)", min_value=0.000, step=0.001, format="%.3f")
 
-# File uploader (no camera)
-uploaded_file = st.file_uploader("Upload an image (jpg, jpeg, png) — this will be page 1 of the PDF", type=["jpg", "jpeg", "png"])
+uploaded_file = st.file_uploader("Upload an image (jpg, jpeg, png) — page 1 of the PDF", type=["jpg", "jpeg", "png"])
 
-# ---------- Calculations ----------
+# ---------- CALCULATIONS ----------
 g_sum_inputs = round(a + b + c + d + e + f, 3)
-h = round(a * 2, 3)
-i = round(b * 2, 3)
-j = round(c * 2, 3)
-k = round(d * 2, 3)
-l = round(e * 2, 3)
-m = round(f * 2, 3)
+h = round(a * 2, 3); i = round(b * 2, 3); j = round(c * 2, 3)
+k = round(d * 2, 3); l = round(e * 2, 3); m = round(f * 2, 3)
 grand_total_sheet = round(h + i + j + k + l + m, 3)
-h_perc = round(h * 10, 3)
-i_perc = round(i * 10, 3)
-j_perc = round(j * 10, 3)
-k_perc = round(k * 10, 3)
-l_perc = round(l * 10, 3)
-m_perc = round(m * 10, 3)
+h_perc = round(h * 10, 3); i_perc = round(i * 10, 3)
+j_perc = round(j * 10, 3); k_perc = round(k * 10, 3)
+l_perc = round(l * 10, 3); m_perc = round(m * 10, 3)
 total_dal_tukdi_perc = round(h_perc + i_perc, 3)
 total_4_perc = round(j_perc + k_perc + l_perc + m_perc, 3)
 total_6_perc = round(total_dal_tukdi_perc + total_4_perc, 3)
@@ -76,8 +63,7 @@ def render_results_table():
     <table class="result-table">
       <thead>
         <tr><th>Item</th><th>Grams</th><th>Percentage</th></tr>
-      </thead>
-      <tbody>
+      </thead><tbody>
         <tr><td>Daal</td><td>{h} g</td><td>{h_perc} %</td></tr>
         <tr><td>Tukdi</td><td>{i} g</td><td>{i_perc} %</td></tr>
         <tr style="font-weight:700;"><td>Total (Dal + Tukdi)</td><td>{total_dal_tukdi_grams} g</td><td>{total_dal_tukdi_perc} %</td></tr>
@@ -87,55 +73,112 @@ def render_results_table():
         <tr><td>14 Mesh</td><td>{m} g</td><td>{m_perc} %</td></tr>
         <tr style="font-weight:700;"><td>Total (4)</td><td>{total_4_grams} g</td><td>{total_4_perc} %</td></tr>
         <tr style="font-weight:700;"><td>Grand Total for Sheet</td><td>{grand_total_sheet} g</td><td>{total_6_perc} %</td></tr>
-      </tbody>
-    </table>
+      </tbody></table>
     """
     st.markdown(html, unsafe_allow_html=True)
+
 render_results_table()
 
-# ---------- Image compression ----------
-MAX_WIDTH, MAX_HEIGHT, JPEG_QUALITY = 1200, 1600, 70
-def resize_and_compress_image(pil_img, max_w=MAX_WIDTH, max_h=MAX_HEIGHT, quality=JPEG_QUALITY):
-    img = pil_img.copy()
-    if img.mode not in ("RGB", "L"):
-        img = img.convert("RGB")
-    img.thumbnail((max_w, max_h), Image.LANCZOS)
-    buf = io.BytesIO()
-    img.save(buf, format="JPEG", quality=quality, optimize=True)
-    buf.seek(0)
-    return buf
+# ---------- Safety limits ----------
+# Server-side settings — tune these based on your server memory
+MAX_UPLOAD_MB = 12         # absolutely reject files bigger than this
+AGGRESSIVE_DOWN_TO_MB = 2  # if > this, downscale aggressively
+MAX_DIMENSION = 1400       # maximum width/height after downscale
+JPEG_QUALITY_NORMAL = 75
+JPEG_QUALITY_AGGRESSIVE = 55
 
-# ---------- PDF generation ----------
+def sizeof_uploaded(u):
+    try:
+        return u.size
+    except Exception:
+        # fallback: read in-memory length
+        u.seek(0, os.SEEK_END)
+        size = u.tell()
+        u.seek(0)
+        return size
+
+# ---------- Image processing helpers ----------
+def adaptive_resize_and_save(uploaded_file_obj):
+    """
+    Returns path to a temporary JPEG file on disk that is safe to give to FPDF.image()
+    This function will:
+    - reject huge files (> MAX_UPLOAD_MB),
+    - if file > AGGRESSIVE_DOWN_TO_MB, downscale aggressively,
+    - else do moderate downscale.
+    """
+    if uploaded_file_obj is None:
+        return None
+
+    size_bytes = sizeof_uploaded(uploaded_file_obj)
+    size_mb = size_bytes / (1024*1024)
+
+    if size_mb > MAX_UPLOAD_MB:
+        raise ValueError(f"Uploaded file is too large ({size_mb:.1f} MB). Please reduce image size below {MAX_UPLOAD_MB} MB and retry.")
+
+    # Choose quality and max dims based on input size
+    if size_mb > AGGRESSIVE_DOWN_TO_MB:
+        max_dim = MAX_DIMENSION
+        quality = JPEG_QUALITY_AGGRESSIVE
+    else:
+        max_dim = MAX_DIMENSION * 1.2
+        quality = JPEG_QUALITY_NORMAL
+
+    # Open image via PIL
+    # uploaded_file_obj is a Streamlit UploadedFile (file-like) — reopen from start
+    uploaded_file_obj.seek(0)
+    pil_img = Image.open(uploaded_file_obj)
+
+    # convert to RGB if needed
+    if pil_img.mode not in ("RGB", "L"):
+        pil_img = pil_img.convert("RGB")
+
+    # compute thumbnail preserving aspect ratio
+    pil_img.thumbnail((max_dim, max_dim), Image.LANCZOS)
+
+    # Save to temp file
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
+    try:
+        pil_img.save(tmp, format="JPEG", quality=quality, optimize=True)
+        tmp.flush()
+        tmp.close()
+        return tmp.name
+    except Exception as e:
+        try:
+            tmp.close()
+            os.remove(tmp.name)
+        except Exception:
+            pass
+        raise
+
+# ---------- PDF generation (both pages in landscape) ----------
 def slugify(value):
     value = str(value or "")
     value = unicodedata.normalize('NFKD', value).encode('ascii', 'ignore').decode('ascii')
     value = re.sub(r'[^\w\s-]', '', value).strip().lower()
     return re.sub(r'[-\s]+', '_', value)
 
-def generate_pdf_bytes(uploaded_img_file, data):
+def generate_pdf_bytes_safe(uploaded_img_file, data):
     pdf = FPDF(format='A4')
 
-    # --- Page 1: image (landscape) ---
+    # PAGE 1: image (landscape), saved to disk first
     if uploaded_img_file is not None:
-        temp_path = None
+        temp_img_path = None
         try:
-            pil_img = Image.open(uploaded_img_file)
-            img_buf = resize_and_compress_image(pil_img)
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmpfile:
-                tmpfile.write(img_buf.read())
-                tmpfile.flush()
-                temp_path = tmpfile.name
+            temp_img_path = adaptive_resize_and_save(uploaded_img_file)
             pdf.add_page(orientation='L')
-            pdf.image(temp_path, x=10, y=10, w=pdf.w - 20)
+            pdf.image(temp_img_path, x=10, y=10, w=pdf.w - 20)
         finally:
-            if temp_path and os.path.exists(temp_path):
-                os.remove(temp_path)
+            if temp_img_path and os.path.exists(temp_img_path):
+                try:
+                    os.remove(temp_img_path)
+                except Exception:
+                    pass
     else:
         pdf.add_page(orientation='L')
         pdf.set_font("Arial", "B", 16)
         pdf.cell(0, 10, "No Image Provided", ln=True, align='C')
 
-    # --- Page 2: report (✅ landscape now) ---
+    # PAGE 2: report (landscape)
     pdf.add_page(orientation='L')
     pdf.set_auto_page_break(auto=True, margin=15)
 
@@ -150,7 +193,7 @@ def generate_pdf_bytes(uploaded_img_file, data):
     pdf.cell(box_w, 6, txt="DAL SPLIT REPORT", ln=1, align='C')
     pdf.ln(6)
 
-    # Party / Date / Vehicle / Gaadi
+    # Info small table
     pdf.set_font("Arial", size=10)
     col_w = (pdf.w - 20) / 2
     row_h = 8
@@ -173,12 +216,14 @@ def generate_pdf_bytes(uploaded_img_file, data):
     pdf.cell(col_w - 4, 4, txt=f"GAADI TYPE : {data['GAADI']}")
     pdf.ln(row_h + 6)
 
-    # Table
+    # Main table area (two columns)
     pdf.set_font("Arial", "B", 10)
     page_inner_w = pdf.w - 20
-    left_col_w, right_col_w = page_inner_w / 2, page_inner_w / 2
+    left_col_w, right_col_w = page_inner_w/2, page_inner_w/2
     table_x, table_y, current_y = 10, pdf.get_y(), pdf.get_y()
     row_h = 8
+
+    # title row
     pdf.rect(table_x, current_y, left_col_w + right_col_w, row_h)
     pdf.set_xy(table_x + 2, current_y + 2)
     pdf.cell(left_col_w - 4, 4, "INDIVIDUAL PARTICLE DATA (in gram)")
@@ -198,6 +243,7 @@ def generate_pdf_bytes(uploaded_img_file, data):
         pdf.multi_cell(right_col_w - 4, 4, right)
         current_y += h
 
+    # rows
     row_two_columns(f"DAAL : {data['DAAL']} gm", f"DAAL : {data['DAAL_PERC']} %")
     row_two_columns(f"TUKDI : {data['TUKDI']} gm", f"TUKDI : {data['TUKDI_PERC']} %")
     row_two_columns(f"TOTAL ( DAAL + TUKDI ) : {data['TOTAL_DTG']} gm", f"TOTAL ( DAAL + TUKDI ) : {data['TOTAL_DTP']} %", True)
@@ -211,7 +257,7 @@ def generate_pdf_bytes(uploaded_img_file, data):
 
     return pdf.output(dest='S').encode('latin-1')
 
-# ---------- Data ----------
+# ---------- Data mapping ----------
 data = {
     "DATE": display_date,
     "VEHICLE": vehicle_number or "",
@@ -225,12 +271,16 @@ data = {
     "CHHALA_PERC": k_perc, "DANKHAL_PERC": l_perc, "MES14_PERC": m_perc
 }
 
-# ---------- Generate & Download ----------
+# ---------- Generate & download ----------
 if st.button("Generate PDF"):
     try:
-        pdf_bytes = generate_pdf_bytes(uploaded_file, data)
+        pdf_bytes = generate_pdf_bytes_safe(uploaded_file, data)
         safe_name = f"{filename_date}_{slugify(vehicle_number)}_{slugify(party_name)}_{slugify(gaadi_type)}_gaadi.pdf"
         st.success("PDF generated — click to download")
         st.download_button("📥 Download PDF", data=pdf_bytes, file_name=safe_name, mime="application/pdf")
+    except ValueError as ve:
+        st.error(str(ve))
     except Exception as ex:
-        st.error(f"Failed to generate PDF: {ex}")
+        st.error("Failed to generate PDF — possibly due to memory constraints.")
+        st.write("Try reducing image file size, or deploy the app to a server with more RAM (see recommended Docker instructions).")
+        st.write(repr(ex))
