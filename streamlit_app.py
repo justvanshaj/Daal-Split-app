@@ -117,7 +117,7 @@ st.markdown("---")
 row_display("Grand Total for Sheet", grand_total, total_6_percent)
 
 # ---------- TEMPLATE (from repo) ----------
-TEMPLATE_PATH = "report_template.txt"
+TEMPLATE_PATH = "report_template.docx"
 
 def load_template(path=TEMPLATE_PATH):
     try:
