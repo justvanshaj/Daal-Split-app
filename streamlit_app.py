@@ -104,7 +104,7 @@ st.subheader("Details — grams and percentage (rows keep aligned on mobile)")
 render_results_table()
 
 # ---------- Robust template loader to avoid UnicodeDecodeError ----------
-def load_template(path="report_template.txt"):
+def load_template(path="report_template.docx"):
     candidates = ["utf-8-sig", "utf-8", "utf-16", "latin-1", "cp1252"]
     for enc in candidates:
         try:
