@@ -23,23 +23,22 @@ header {visibility: hidden;}
 """, unsafe_allow_html=True)
 
 # ---------- INPUTS ----------
-selected_date = st.date_input("Select Date (DD/MM/YYYY)", value=datetime.date.today())
+selected_date = st.date_input("Enter Date", value=datetime.date.today())
 display_date = selected_date.strftime("%d/%m/%Y")
 filename_date = selected_date.strftime("%Y-%m-%d")
 
 vehicle_number = st.text_input("Vehicle Number:")
 party_name = st.text_input("Party Name:")
-gaadi_type = st.radio("Gaadi Type:", ["Khadi", "Poori"])
+gaadi_type = st.radio("Gaadi Type:", ["KHADI", "POORI"])
 
-st.write("Enter weights (input values; app computes sheet grams = input * 2). Precision: 3 decimals")
-a = st.number_input("Daal (input)", min_value=0.000, step=0.001, format="%.3f")
-b = st.number_input("Tukdi (input)", min_value=0.000, step=0.001, format="%.3f")
-c = st.number_input("Red/Black (input)", min_value=0.000, step=0.001, format="%.3f")
-d = st.number_input("Chhala (input)", min_value=0.000, step=0.001, format="%.3f")
-e = st.number_input("Dankhal (input)", min_value=0.000, step=0.001, format="%.3f")
-f = st.number_input("14 Mesh (input)", min_value=0.000, step=0.001, format="%.3f")
+a = st.number_input("Daal", min_value=0.000, step=0.001, format="%.3f")
+b = st.number_input("Tukdi", min_value=0.000, step=0.001, format="%.3f")
+c = st.number_input("Red/Black", min_value=0.000, step=0.001, format="%.3f")
+d = st.number_input("Chhala", min_value=0.000, step=0.001, format="%.3f")
+e = st.number_input("Dankhal", min_value=0.000, step=0.001, format="%.3f")
+f = st.number_input("14 Mesh", min_value=0.000, step=0.001, format="%.3f")
 
-uploaded_file = st.file_uploader("Upload an image (jpg, jpeg, png) — page 1 of the PDF", type=["jpg", "jpeg", "png"])
+uploaded_file = st.file_uploader("Capture/Upload an image", type=["jpg", "jpeg", "png"])
 
 # ---------- CALCULATIONS ----------
 g_sum_inputs = round(a + b + c + d + e + f, 3)
@@ -56,8 +55,8 @@ total_dal_tukdi_grams = round(h + i, 3)
 total_4_grams = round(j + k + l + m, 3)
 
 # ---------- Preview table ----------
-st.subheader("Results preview")
-st.write(f"Grand total (sum of inputs): **{g_sum_inputs} g**")
+st.subheader("Results")
+st.write(f"Live Input Checker: **{g_sum_inputs} gm**")
 def render_results_table():
     html = f"""
     <table class="result-table">
@@ -272,12 +271,12 @@ data = {
 }
 
 # ---------- Generate & download ----------
-if st.button("Generate PDF"):
+if st.button("Generate Karo"):
     try:
         pdf_bytes = generate_pdf_bytes_safe(uploaded_file, data)
         safe_name = f"{filename_date}_{slugify(vehicle_number)}_{slugify(party_name)}_{slugify(gaadi_type)}_gaadi.pdf"
-        st.success("PDF generated — click to download")
-        st.download_button("📥 Download PDF", data=pdf_bytes, file_name=safe_name, mime="application/pdf")
+        st.success("PDF generate hogayi")
+        st.download_button("📥 Download Karo", data=pdf_bytes, file_name=safe_name, mime="application/pdf")
     except ValueError as ve:
         st.error(str(ve))
     except Exception as ex:
