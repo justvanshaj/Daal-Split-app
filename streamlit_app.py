@@ -149,7 +149,7 @@ if st.button("Generate Karo"):
     try:
         pdf_bytes = generate_pdf_bytes_safe(uploaded_file, data)
 
-        # ✅ NEW PRETTY RENAMING SYSTEM (ONLY CHANGE)
+        # ✅ ONLY RENAMING SYSTEM CHANGED
         pretty_date = selected_date.strftime("%d-%m-%Y")
         pretty_vehicle = (vehicle_number or "").upper().replace("_", "-").strip()
         pretty_party = (party_name or "").title().strip()
