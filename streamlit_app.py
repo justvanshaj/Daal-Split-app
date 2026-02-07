@@ -107,12 +107,8 @@ if st.button("Generate Karo"):
     pdf_bytes = generate_pdf_bytes_safe(uploaded_file)
 
     # ✅ ONLY RENAMING SYSTEM
-    pretty_date = selected_date.strftime("%d-%m-%Y")
-    pretty_vehicle = (vehicle_number or "").upper().replace("_","-").strip()
-    pretty_party = (party_name or "").title().strip()
-    pretty_gaadi = f"{gaadi_type.title()}-Gaadi"
+    safe_name = f"{filename_date}_{slugify(vehicle_number)}_{slugify(party_name)}_{slugify(gaadi_type)}_gaadi.pdf"
 
-    safe_name = f"{pretty_date} {pretty_vehicle} {pretty_party} {pretty_gaadi}.pdf"
     safe_name = re.sub(r'[<>:"/\\|?*]', '', safe_name)
 
     st.success("PDF generate hogayi")
