@@ -276,11 +276,7 @@ data = {
 if st.button("Generate Karo"):
     try:
         pdf_bytes = generate_pdf_bytes_safe(uploaded_file, data)
-        pretty_date = selected_date.strftime("%d-%m-%Y")
-        pretty_vehicle = (vehicle_number or "").upper().replace("_", "-").strip()
-        pretty_party = (party_name or "").title().strip()
-        pretty_gaadi = f"{gaadi_type.title()}-Gaadi"
-        
+        safe_name = f"{filename_date}_{slugify(vehicle_number)}_{slugify(party_name)}_{slugify(gaadi_type)}_gaadi.pdf"
         st.success("PDF generate hogayi")
         st.download_button("📥 Download Karo", data=pdf_bytes, file_name=safe_name, mime="application/pdf")
     except ValueError as ve:
