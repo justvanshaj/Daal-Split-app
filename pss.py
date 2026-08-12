@@ -3,7 +3,6 @@ import random
 import string
 import time
 import threading
-import html
 
 from streamlit_autorefresh import st_autorefresh
 
@@ -37,14 +36,14 @@ ROOM_LOCK = threading.Lock()
 # SESSION STATE
 # ============================================================
 
-defaults = {
+DEFAULTS = {
     "screen": "welcome",
     "room_code": None,
     "player_name": None,
     "role": None,
 }
 
-for key, value in defaults.items():
+for key, value in DEFAULTS.items():
 
     if key not in st.session_state:
         st.session_state[key] = value
@@ -68,93 +67,86 @@ def generate_room_code():
         )
 
         if code not in ROOMS:
+
             return code
 
 
 # ============================================================
-# TICKET GENERATION
+# GENERATE HOUSIE TICKET
 # ============================================================
 
 def generate_ticket():
 
     """
-    Standard Tambola/Housie ticket:
+    Standard 3 x 9 Tambola ticket.
 
-    3 rows × 9 columns
-    15 numbers total
-    5 numbers per row
+    15 numbers total.
+    5 numbers in each row.
     """
 
     while True:
 
         # ----------------------------------------------------
-        # Choose how many numbers each column contains.
-        # Each column must have at least one number.
-        # Total = 15.
+        # Select how many numbers each column has
         # ----------------------------------------------------
 
         counts = [1] * 9
 
         remaining = 6
 
-        while remaining > 0:
+        while remaining:
 
             possible = [
-                i for i in range(9)
+                i
+                for i in range(9)
                 if counts[i] < 3
             ]
 
-            column = random.choice(possible)
+            col = random.choice(possible)
 
-            counts[column] += 1
+            counts[col] += 1
 
             remaining -= 1
 
         # ----------------------------------------------------
-        # Select rows for every column.
+        # Select rows for each column
         # ----------------------------------------------------
 
-        grid = [
-            [None for _ in range(9)]
+        positions = [
+            [False] * 9
             for _ in range(3)
         ]
 
-        valid = True
-
         for col in range(9):
-
-            number_count = counts[col]
 
             rows = random.sample(
                 range(3),
-                number_count
+                counts[col]
             )
 
             for row in rows:
 
-                grid[row][col] = True
+                positions[row][col] = True
 
         # ----------------------------------------------------
-        # Every row must contain exactly 5 numbers.
+        # Check each row has exactly 5 numbers
         # ----------------------------------------------------
 
-        for row in range(3):
+        if any(
+            sum(row) != 5
+            for row in positions
+        ):
 
-            if sum(
-                1 for x in grid[row]
-                if x
-            ) != 5:
-
-                valid = False
-
-        if not valid:
             continue
 
         # ----------------------------------------------------
-        # Generate numbers for each column.
+        # Create ticket
         # ----------------------------------------------------
 
-        numbers = []
+        ticket = [
+            [None] * 9
+            for _ in range(3)
+        ]
 
         for col in range(9):
 
@@ -168,52 +160,29 @@ def generate_ticket():
 
             else:
 
-                start = col * 10
-
                 pool = list(
                     range(
-                        start,
-                        start + 10
+                        col * 10,
+                        col * 10 + 10
                     )
                 )
-
-            count = counts[col]
 
             selected = sorted(
                 random.sample(
                     pool,
-                    count
+                    counts[col]
                 )
             )
 
-            numbers.append(selected)
-
-        # ----------------------------------------------------
-        # Put numbers into grid.
-        # ----------------------------------------------------
-
-        ticket = [
-            [None for _ in range(9)]
-            for _ in range(3)
-        ]
-
-        for col in range(9):
-
-            selected_numbers = numbers[col]
-
-            number_index = 0
+            index = 0
 
             for row in range(3):
 
-                if grid[row][col]:
+                if positions[row][col]:
 
-                    ticket[row][col] = (
-                        selected_numbers[
-                            number_index
-                        ]
-                    )
+                    ticket[row][col] = selected[index]
 
-                    number_index += 1
+                    index += 1
 
         return ticket
 
@@ -263,7 +232,7 @@ def create_room(host_name):
 
         "last_activity": time.time(),
 
-        "version": 0
+        "version": 0,
     }
 
     with ROOM_LOCK:
@@ -281,11 +250,11 @@ def cleanup_rooms():
 
     now = time.time()
 
-    expired = []
-
     with ROOM_LOCK:
 
-        for code, room in list(ROOMS.items()):
+        expired = []
+
+        for code, room in ROOMS.items():
 
             if now - room["last_activity"] > 21600:
 
@@ -300,7 +269,7 @@ cleanup_rooms()
 
 
 # ============================================================
-# HOME
+# RETURN HOME
 # ============================================================
 
 def return_home():
@@ -317,7 +286,531 @@ def return_home():
 
 
 # ============================================================
-# WELCOME SCREEN
+# NUMBER WORDS
+# ============================================================
+
+NUMBER_WORDS = {
+    1: "ONE",
+    2: "TWO",
+    3: "THREE",
+    4: "FOUR",
+    5: "FIVE",
+    6: "SIX",
+    7: "SEVEN",
+    8: "EIGHT",
+    9: "NINE",
+    10: "TEN",
+    11: "ELEVEN",
+    12: "TWELVE",
+    13: "THIRTEEN",
+    14: "FOURTEEN",
+    15: "FIFTEEN",
+    16: "SIXTEEN",
+    17: "SEVENTEEN",
+    18: "EIGHTEEN",
+    19: "NINETEEN",
+    20: "TWENTY",
+    21: "TWENTY ONE",
+    22: "TWENTY TWO",
+    23: "TWENTY THREE",
+    24: "TWENTY FOUR",
+    25: "TWENTY FIVE",
+    26: "TWENTY SIX",
+    27: "TWENTY SEVEN",
+    28: "TWENTY EIGHT",
+    29: "TWENTY NINE",
+    30: "THIRTY",
+    31: "THIRTY ONE",
+    32: "THIRTY TWO",
+    33: "THIRTY THREE",
+    34: "THIRTY FOUR",
+    35: "THIRTY FIVE",
+    36: "THIRTY SIX",
+    37: "THIRTY SEVEN",
+    38: "THIRTY EIGHT",
+    39: "THIRTY NINE",
+    40: "FORTY",
+    41: "FORTY ONE",
+    42: "FORTY TWO",
+    43: "FORTY THREE",
+    44: "FORTY FOUR",
+    45: "FORTY FIVE",
+    46: "FORTY SIX",
+    47: "FORTY SEVEN",
+    48: "FORTY EIGHT",
+    49: "FORTY NINE",
+    50: "FIFTY",
+    51: "FIFTY ONE",
+    52: "FIFTY TWO",
+    53: "FIFTY THREE",
+    54: "FIFTY FOUR",
+    55: "FIFTY FIVE",
+    56: "FIFTY SIX",
+    57: "FIFTY SEVEN",
+    58: "FIFTY EIGHT",
+    59: "FIFTY NINE",
+    60: "SIXTY",
+    61: "SIXTY ONE",
+    62: "SIXTY TWO",
+    63: "SIXTY THREE",
+    64: "SIXTY FOUR",
+    65: "SIXTY FIVE",
+    66: "SIXTY SIX",
+    67: "SIXTY SEVEN",
+    68: "SIXTY EIGHT",
+    69: "SIXTY NINE",
+    70: "SEVENTY",
+    71: "SEVENTY ONE",
+    72: "SEVENTY TWO",
+    73: "SEVENTY THREE",
+    74: "SEVENTY FOUR",
+    75: "SEVENTY FIVE",
+    76: "SEVENTY SIX",
+    77: "SEVENTY SEVEN",
+    78: "SEVENTY EIGHT",
+    79: "SEVENTY NINE",
+    80: "EIGHTY",
+    81: "EIGHTY ONE",
+    82: "EIGHTY TWO",
+    83: "EIGHTY THREE",
+    84: "EIGHTY FOUR",
+    85: "EIGHTY FIVE",
+    86: "EIGHTY SIX",
+    87: "EIGHTY SEVEN",
+    88: "EIGHTY EIGHT",
+    89: "EIGHTY NINE",
+    90: "NINETY",
+}
+
+
+def number_word(number):
+
+    return NUMBER_WORDS.get(
+        number,
+        str(number)
+    )
+
+
+# ============================================================
+# DRAW NUMBER
+# ============================================================
+
+def draw_next_number(room):
+
+    if room["next_number_index"] >= 90:
+
+        room["game_finished"] = True
+
+        return
+
+    number = room["number_sequence"][
+        room["next_number_index"]
+    ]
+
+    room["next_number_index"] += 1
+
+    room["current_number"] = number
+
+    room["called_numbers"].append(number)
+
+    room["last_draw_time"] = time.time()
+
+    room["last_activity"] = time.time()
+
+    room["version"] += 1
+
+
+# ============================================================
+# START GAME
+# ============================================================
+
+def start_game(room):
+
+    if not room["players"]:
+
+        return False
+
+    room["game_started"] = True
+
+    room["game_finished"] = False
+
+    room["game_start_time"] = time.time()
+
+    room["last_draw_time"] = None
+
+    room["last_activity"] = time.time()
+
+    room["version"] += 1
+
+    # First number immediately
+    draw_next_number(room)
+
+    return True
+
+
+# ============================================================
+# AUTOMATIC NUMBER CALLER
+# ============================================================
+
+def process_automatic_draw(room):
+
+    if not room["game_started"]:
+        return
+
+    if room["game_finished"]:
+        return
+
+    if room["game_start_time"] is None:
+        return
+
+    now = time.time()
+
+    elapsed = (
+        now - room["game_start_time"]
+    )
+
+    expected_count = (
+        int(elapsed // room["interval"]) + 1
+    )
+
+    current_count = len(
+        room["called_numbers"]
+    )
+
+    while (
+        current_count < expected_count
+        and current_count < 90
+    ):
+
+        draw_next_number(room)
+
+        current_count = len(
+            room["called_numbers"]
+        )
+
+
+# ============================================================
+# COUNTDOWN
+# ============================================================
+
+def seconds_until_next(room):
+
+    if not room["game_started"]:
+
+        return 15
+
+    if room["game_finished"]:
+
+        return 0
+
+    if room["last_draw_time"] is None:
+
+        return 15
+
+    elapsed = (
+        time.time()
+        - room["last_draw_time"]
+    )
+
+    return max(
+        0,
+        int(
+            room["interval"] - elapsed
+        )
+    )
+
+
+# ============================================================
+# TICKET HTML
+# ============================================================
+
+def ticket_html(ticket, called_numbers):
+
+    called = set(called_numbers)
+
+    rows_html = ""
+
+    for row in ticket:
+
+        cells_html = ""
+
+        for number in row:
+
+            if number is None:
+
+                cells_html += """
+                <div class="empty-cell"></div>
+                """
+
+            elif number in called:
+
+                cells_html += f"""
+                <div class="number-cell called">
+                    <span>{number}</span>
+                    <span class="tick">✓</span>
+                </div>
+                """
+
+            else:
+
+                cells_html += f"""
+                <div class="number-cell">
+                    <span>{number}</span>
+                </div>
+                """
+
+        rows_html += f"""
+        <div class="ticket-row">
+            {cells_html}
+        </div>
+        """
+
+    return f"""
+    <style>
+
+    .housie-ticket {{
+        width:100%;
+        max-width:760px;
+        margin:20px auto;
+        border:4px solid #333;
+        border-radius:14px;
+        overflow:hidden;
+        background:white;
+        box-shadow:
+            0 5px 20px rgba(0,0,0,0.18);
+    }}
+
+    .ticket-row {{
+        display:grid;
+        grid-template-columns:repeat(9,1fr);
+    }}
+
+    .empty-cell,
+    .number-cell {{
+        height:75px;
+        border:1px solid #777;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        position:relative;
+        font-size:29px;
+        font-weight:800;
+    }}
+
+    .empty-cell {{
+        background:#eeeeee;
+    }}
+
+    .number-cell {{
+        background:#ffffff;
+        color:#111111;
+    }}
+
+    .number-cell.called {{
+        background:#39d98a;
+        color:#063b1d;
+    }}
+
+    .tick {{
+        position:absolute;
+        right:5px;
+        bottom:2px;
+        font-size:18px;
+        font-weight:900;
+    }}
+
+    @media(max-width:600px) {{
+
+        .empty-cell,
+        .number-cell {{
+            height:55px;
+            font-size:20px;
+        }}
+
+        .tick {{
+            font-size:13px;
+        }}
+    }}
+
+    </style>
+
+    <div class="housie-ticket">
+
+        {rows_html}
+
+    </div>
+    """
+
+
+# ============================================================
+# CLAIM VALIDATION
+# ============================================================
+
+def validate_claim(
+    room,
+    player_name,
+    claim_type
+):
+
+    ticket = room["tickets"][player_name]
+
+    called = set(
+        room["called_numbers"]
+    )
+
+    numbers = [
+        number
+        for row in ticket
+        for number in row
+        if number is not None
+    ]
+
+    # --------------------------------------------------------
+    # EARLY FIVE
+    # --------------------------------------------------------
+
+    if claim_type == "Early Five":
+
+        return sum(
+            number in called
+            for number in numbers
+        ) >= 5
+
+    # --------------------------------------------------------
+    # TOP LINE
+    # --------------------------------------------------------
+
+    if claim_type == "Top Line":
+
+        return all(
+            number is None
+            or number in called
+            for number in ticket[0]
+        )
+
+    # --------------------------------------------------------
+    # MIDDLE LINE
+    # --------------------------------------------------------
+
+    if claim_type == "Middle Line":
+
+        return all(
+            number is None
+            or number in called
+            for number in ticket[1]
+        )
+
+    # --------------------------------------------------------
+    # BOTTOM LINE
+    # --------------------------------------------------------
+
+    if claim_type == "Bottom Line":
+
+        return all(
+            number is None
+            or number in called
+            for number in ticket[2]
+        )
+
+    # --------------------------------------------------------
+    # FOUR CORNERS
+    # --------------------------------------------------------
+
+    if claim_type == "Four Corners":
+
+        top_numbers = [
+            n for n in ticket[0]
+            if n is not None
+        ]
+
+        bottom_numbers = [
+            n for n in ticket[2]
+            if n is not None
+        ]
+
+        if not top_numbers or not bottom_numbers:
+
+            return False
+
+        corners = [
+            top_numbers[0],
+            top_numbers[-1],
+            bottom_numbers[0],
+            bottom_numbers[-1],
+        ]
+
+        return all(
+            n in called
+            for n in corners
+        )
+
+    # --------------------------------------------------------
+    # FULL HOUSE
+    # --------------------------------------------------------
+
+    if claim_type == "Full House":
+
+        return all(
+            number in called
+            for number in numbers
+        )
+
+    return False
+
+
+# ============================================================
+# MAKE CLAIM
+# ============================================================
+
+def make_claim(
+    room,
+    player_name,
+    claim_type
+):
+
+    # Don't allow duplicate claim
+    for claim in room["claims"]:
+
+        if (
+            claim["player"] == player_name
+            and claim["type"] == claim_type
+        ):
+
+            return
+
+    valid = validate_claim(
+        room,
+        player_name,
+        claim_type
+    )
+
+    claim = {
+        "player": player_name,
+        "type": claim_type,
+        "valid": valid,
+        "time": time.time(),
+    }
+
+    room["claims"].append(claim)
+
+    if valid:
+
+        room["winners"].setdefault(
+            claim_type,
+            []
+        )
+
+        room["winners"][
+            claim_type
+        ].append(player_name)
+
+    room["last_activity"] = time.time()
+
+    room["version"] += 1
+
+
+# ============================================================
+# WELCOME
 # ============================================================
 
 def welcome_screen():
@@ -331,7 +824,7 @@ def welcome_screen():
 
         <h1>🎉 KITTY HOUSIE 🎉</h1>
 
-        <p style="font-size:20px;">
+        <p style="font-size:21px;">
         Fun • Friends • Numbers • Prizes
         </p>
 
@@ -367,7 +860,7 @@ def welcome_screen():
         st.markdown("## 🎟️ PLAYER")
 
         st.write(
-            "Join using the room code provided by the host."
+            "Join using the room code from the host."
         )
 
         if st.button(
@@ -405,7 +898,7 @@ def host_screen():
         if not name:
 
             st.warning(
-                "Please enter the host name."
+                "Please enter your name."
             )
 
             return
@@ -481,7 +974,13 @@ def player_screen():
 
         room = ROOMS[code]
 
-        if name in room["players"]:
+        # Case-insensitive duplicate check
+        existing_names = [
+            p.lower()
+            for p in room["players"]
+        ]
+
+        if name.lower() in existing_names:
 
             st.error(
                 "That name is already being used."
@@ -489,13 +988,11 @@ def player_screen():
 
             return
 
-        ticket = generate_ticket()
-
         room["players"][name] = {
             "joined_at": time.time()
         }
 
-        room["tickets"][name] = ticket
+        room["tickets"][name] = generate_ticket()
 
         room["last_activity"] = time.time()
 
@@ -517,527 +1014,6 @@ def player_screen():
 
 
 # ============================================================
-# DRAW NEXT NUMBER
-# ============================================================
-
-def draw_next_number(room):
-
-    if room["next_number_index"] >= 90:
-
-        room["game_finished"] = True
-
-        return
-
-    number = room["number_sequence"][
-        room["next_number_index"]
-    ]
-
-    room["next_number_index"] += 1
-
-    room["current_number"] = number
-
-    room["called_numbers"].append(number)
-
-    room["last_draw_time"] = time.time()
-
-    room["last_activity"] = time.time()
-
-    room["version"] += 1
-
-
-# ============================================================
-# AUTOMATIC HOST DRAW
-# ============================================================
-
-def process_automatic_draw(room):
-
-    if not room["game_started"]:
-        return
-
-    if room["game_finished"]:
-        return
-
-    if room["game_start_time"] is None:
-        return
-
-    now = time.time()
-
-    elapsed = now - room["game_start_time"]
-
-    expected_number_count = int(
-        elapsed // room["interval"]
-    ) + 1
-
-    current_count = len(
-        room["called_numbers"]
-    )
-
-    while (
-        current_count
-        < expected_number_count
-        and current_count < 90
-    ):
-
-        draw_next_number(room)
-
-        current_count = len(
-            room["called_numbers"]
-        )
-
-
-# ============================================================
-# START GAME
-# ============================================================
-
-def start_game(room):
-
-    if not room["players"]:
-        return False
-
-    room["game_started"] = True
-
-    room["game_finished"] = False
-
-    room["game_start_time"] = time.time()
-
-    room["last_draw_time"] = None
-
-    room["last_activity"] = time.time()
-
-    room["version"] += 1
-
-    # First number immediately
-    draw_next_number(room)
-
-    return True
-
-
-# ============================================================
-# GET REMAINING TIME
-# ============================================================
-
-def seconds_until_next(room):
-
-    if not room["game_started"]:
-        return 15
-
-    if room["game_finished"]:
-        return 0
-
-    if room["last_draw_time"] is None:
-        return 15
-
-    elapsed = (
-        time.time()
-        - room["last_draw_time"]
-    )
-
-    remaining = room["interval"] - elapsed
-
-    return max(
-        0,
-        int(remaining)
-    )
-
-
-# ============================================================
-# NUMBER WORD
-# ============================================================
-
-def number_word(number):
-
-    words = {
-        1: "ONE",
-        2: "TWO",
-        3: "THREE",
-        4: "FOUR",
-        5: "FIVE",
-        6: "SIX",
-        7: "SEVEN",
-        8: "EIGHT",
-        9: "NINE",
-        10: "TEN",
-        11: "ELEVEN",
-        12: "TWELVE",
-        13: "THIRTEEN",
-        14: "FOURTEEN",
-        15: "FIFTEEN",
-        16: "SIXTEEN",
-        17: "SEVENTEEN",
-        18: "EIGHTEEN",
-        19: "NINETEEN",
-        20: "TWENTY",
-        21: "TWENTY ONE",
-        22: "TWENTY TWO",
-        23: "TWENTY THREE",
-        24: "TWENTY FOUR",
-        25: "TWENTY FIVE",
-        26: "TWENTY SIX",
-        27: "TWENTY SEVEN",
-        28: "TWENTY EIGHT",
-        29: "TWENTY NINE",
-        30: "THIRTY",
-        31: "THIRTY ONE",
-        32: "THIRTY TWO",
-        33: "THIRTY THREE",
-        34: "THIRTY FOUR",
-        35: "THIRTY FIVE",
-        36: "THIRTY SIX",
-        37: "THIRTY SEVEN",
-        38: "THIRTY EIGHT",
-        39: "THIRTY NINE",
-        40: "FORTY",
-        41: "FORTY ONE",
-        42: "FORTY TWO",
-        43: "FORTY THREE",
-        44: "FORTY FOUR",
-        45: "FORTY FIVE",
-        46: "FORTY SIX",
-        47: "FORTY SEVEN",
-        48: "FORTY EIGHT",
-        49: "FORTY NINE",
-        50: "FIFTY",
-        51: "FIFTY ONE",
-        52: "FIFTY TWO",
-        53: "FIFTY THREE",
-        54: "FIFTY FOUR",
-        55: "FIFTY FIVE",
-        56: "FIFTY SIX",
-        57: "FIFTY SEVEN",
-        58: "FIFTY EIGHT",
-        59: "FIFTY NINE",
-        60: "SIXTY",
-        61: "SIXTY ONE",
-        62: "SIXTY TWO",
-        63: "SIXTY THREE",
-        64: "SIXTY FOUR",
-        65: "SIXTY FIVE",
-        66: "SIXTY SIX",
-        67: "SIXTY SEVEN",
-        68: "SIXTY EIGHT",
-        69: "SIXTY NINE",
-        70: "SEVENTY",
-        71: "SEVENTY ONE",
-        72: "SEVENTY TWO",
-        73: "SEVENTY THREE",
-        74: "SEVENTY FOUR",
-        75: "SEVENTY FIVE",
-        76: "SEVENTY SIX",
-        77: "SEVENTY SEVEN",
-        78: "SEVENTY EIGHT",
-        79: "SEVENTY NINE",
-        80: "EIGHTY",
-        81: "EIGHTY ONE",
-        82: "EIGHTY TWO",
-        83: "EIGHTY THREE",
-        84: "EIGHTY FOUR",
-        85: "EIGHTY FIVE",
-        86: "EIGHTY SIX",
-        87: "EIGHTY SEVEN",
-        88: "EIGHTY EIGHT",
-        89: "EIGHTY NINE",
-        90: "NINETY",
-    }
-
-    return words.get(
-        number,
-        str(number)
-    )
-
-
-# ============================================================
-# TICKET HTML
-# ============================================================
-
-def ticket_html(ticket, called_numbers):
-
-    called = set(called_numbers)
-
-    output = """
-    <div style="
-        width:100%;
-        max-width:700px;
-        margin:auto;
-        border:4px solid #333;
-        border-radius:15px;
-        overflow:hidden;
-        box-shadow:0 5px 20px rgba(0,0,0,0.2);
-    ">
-    """
-
-    for row in ticket:
-
-        output += """
-        <div style="
-            display:grid;
-            grid-template-columns:repeat(9,1fr);
-        ">
-        """
-
-        for number in row:
-
-            if number is None:
-
-                output += """
-                <div style="
-                    height:65px;
-                    background:#eeeeee;
-                    border:1px solid #999;
-                ">
-                </div>
-                """
-
-            else:
-
-                if number in called:
-
-                    background = "#58d68d"
-                    text_color = "#083b1c"
-
-                    mark = "✓"
-
-                else:
-
-                    background = "#ffffff"
-                    text_color = "#111111"
-
-                    mark = ""
-
-                output += f"""
-                <div style="
-                    height:65px;
-                    background:{background};
-                    color:{text_color};
-                    border:1px solid #777;
-                    display:flex;
-                    align-items:center;
-                    justify-content:center;
-                    font-size:27px;
-                    font-weight:800;
-                    position:relative;
-                ">
-
-                    {number}
-
-                    <span style="
-                        position:absolute;
-                        right:5px;
-                        bottom:1px;
-                        font-size:14px;
-                    ">
-                    {mark}
-                    </span>
-
-                </div>
-                """
-
-        output += "</div>"
-
-    output += "</div>"
-
-    return output
-
-
-# ============================================================
-# CLAIM VALIDATION
-# ============================================================
-
-def validate_claim(
-    room,
-    player_name,
-    claim_type
-):
-
-    ticket = room["tickets"][player_name]
-
-    called = set(
-        room["called_numbers"]
-    )
-
-    numbers = [
-        number
-        for row in ticket
-        for number in row
-        if number is not None
-    ]
-
-    # --------------------------------------------------------
-    # EARLY FIVE
-    # --------------------------------------------------------
-
-    if claim_type == "Early Five":
-
-        return sum(
-            1 for number in numbers
-            if number in called
-        ) >= 5
-
-    # --------------------------------------------------------
-    # TOP LINE
-    # --------------------------------------------------------
-
-    if claim_type == "Top Line":
-
-        return all(
-            number is None
-            or number in called
-            for number in ticket[0]
-        )
-
-    # --------------------------------------------------------
-    # MIDDLE LINE
-    # --------------------------------------------------------
-
-    if claim_type == "Middle Line":
-
-        return all(
-            number is None
-            or number in called
-            for number in ticket[1]
-        )
-
-    # --------------------------------------------------------
-    # BOTTOM LINE
-    # --------------------------------------------------------
-
-    if claim_type == "Bottom Line":
-
-        return all(
-            number is None
-            or number in called
-            for number in ticket[2]
-        )
-
-    # --------------------------------------------------------
-    # FOUR CORNERS
-    # --------------------------------------------------------
-
-    if claim_type == "Four Corners":
-
-        first = None
-        last = None
-
-        # First number
-        for number in ticket[0]:
-
-            if number is not None:
-
-                first = number
-                break
-
-        # Last number
-        for number in reversed(ticket[0]):
-
-            if number is not None:
-
-                last = number
-                break
-
-        # Bottom first
-        bottom_first = None
-
-        for number in ticket[2]:
-
-            if number is not None:
-
-                bottom_first = number
-                break
-
-        # Bottom last
-        bottom_last = None
-
-        for number in reversed(ticket[2]):
-
-            if number is not None:
-
-                bottom_last = number
-                break
-
-        corners = [
-            first,
-            last,
-            bottom_first,
-            bottom_last
-        ]
-
-        return all(
-            number in called
-            for number in corners
-            if number is not None
-        )
-
-    # --------------------------------------------------------
-    # FULL HOUSE
-    # --------------------------------------------------------
-
-    if claim_type == "Full House":
-
-        return all(
-            number in called
-            for number in numbers
-        )
-
-    return False
-
-
-# ============================================================
-# CLAIM
-# ============================================================
-
-def make_claim(
-    room,
-    player_name,
-    claim_type
-):
-
-    # Don't allow same claim twice
-    existing = room["claims"]
-
-    for claim in existing:
-
-        if (
-            claim["player"] == player_name
-            and claim["type"] == claim_type
-        ):
-
-            return
-
-    valid = validate_claim(
-        room,
-        player_name,
-        claim_type
-    )
-
-    claim = {
-
-        "player": player_name,
-
-        "type": claim_type,
-
-        "valid": valid,
-
-        "time": time.time()
-    }
-
-    room["claims"].append(claim)
-
-    if valid:
-
-        room["winners"].setdefault(
-            claim_type,
-            []
-        )
-
-        room["winners"][claim_type].append(
-            player_name
-        )
-
-    room["last_activity"] = time.time()
-
-    room["version"] += 1
-
-
-# ============================================================
 # HOST ROOM
 # ============================================================
 
@@ -1051,12 +1027,18 @@ def host_room():
             "Room no longer exists."
         )
 
+        if st.button("Return Home"):
+
+            return_home()
+
         return
 
     room = ROOMS[code]
 
     # Automatic caller
     process_automatic_draw(room)
+
+    room["last_activity"] = time.time()
 
     # --------------------------------------------------------
     # HEADER
@@ -1067,10 +1049,13 @@ def host_room():
         <div style="
             text-align:center;
         ">
+
         <h1>🎉 KITTY HOUSIE 🎉</h1>
+
         <p style="font-size:20px;">
         Official Number Caller
         </p>
+
         </div>
         """,
         unsafe_allow_html=True
@@ -1079,14 +1064,13 @@ def host_room():
     st.divider()
 
     # --------------------------------------------------------
-    # ROOM
+    # ROOM CODE
     # --------------------------------------------------------
 
     st.markdown(
         f"""
         <div style="
             text-align:center;
-            padding:10px;
         ">
 
         <div style="font-size:18px;">
@@ -1094,7 +1078,7 @@ def host_room():
         </div>
 
         <div style="
-            font-size:38px;
+            font-size:40px;
             font-weight:bold;
             letter-spacing:8px;
         ">
@@ -1105,8 +1089,6 @@ def host_room():
         """,
         unsafe_allow_html=True
     )
-
-    st.divider()
 
     # --------------------------------------------------------
     # PLAYERS
@@ -1131,7 +1113,7 @@ def host_room():
         )
 
     # --------------------------------------------------------
-    # START
+    # START GAME
     # --------------------------------------------------------
 
     if not room["game_started"]:
@@ -1142,9 +1124,9 @@ def host_room():
             """
             ### 🎯 Ready?
 
-            Keep this device in the centre of the group.
+            Keep this screen in the centre of the group.
 
-            Once started, a new number will automatically
+            After starting, a new number will automatically
             appear every **15 seconds**.
             """
         )
@@ -1181,21 +1163,22 @@ def host_room():
                 f"""
                 <div style="
                     text-align:center;
-                    padding:25px;
+                    padding:30px;
                     border-radius:25px;
                     background:#f8f9fa;
                     border:5px solid #333;
+                    margin-top:15px;
                 ">
 
                 <div style="
-                    font-size:25px;
+                    font-size:26px;
                     font-weight:bold;
                 ">
                 🔊 NUMBER CALLED
                 </div>
 
                 <div style="
-                    font-size:130px;
+                    font-size:150px;
                     font-weight:900;
                     line-height:1;
                     margin:20px;
@@ -1204,7 +1187,7 @@ def host_room():
                 </div>
 
                 <div style="
-                    font-size:30px;
+                    font-size:32px;
                     font-weight:bold;
                 ">
                 {number_word(current)}
@@ -1230,24 +1213,28 @@ def host_room():
                     margin:20px;
                 ">
 
-                <div style="
-                    font-size:20px;
-                ">
-                Next number in
+                <div style="font-size:20px;">
+                NEXT NUMBER IN
                 </div>
 
                 <div style="
-                    font-size:55px;
+                    font-size:60px;
                     font-weight:bold;
                 ">
                 {remaining}
                 </div>
 
-                seconds
+                SECONDS
 
                 </div>
                 """,
                 unsafe_allow_html=True
+            )
+
+        else:
+
+            st.success(
+                "🎉 All 90 numbers have been called."
             )
 
         # ----------------------------------------------------
@@ -1262,9 +1249,7 @@ def host_room():
 
         for index, number in enumerate(called):
 
-            cols[
-                index % 10
-            ].markdown(
+            cols[index % 10].markdown(
                 f"""
                 <div style="
                     text-align:center;
@@ -1324,26 +1309,25 @@ def host_room():
         use_container_width=True
     ):
 
-        new_room = create_room(
+        new_code = create_room(
             room["host"]
         )
 
-        # Move existing players into new room
-        new_room_data = ROOMS[new_room]
+        new_room = ROOMS[new_code]
 
         for player in room["players"]:
 
-            new_room_data["players"][player] = {
+            new_room["players"][player] = {
                 "joined_at": time.time()
             }
 
-            new_room_data["tickets"][player] = (
+            new_room["tickets"][player] = (
                 generate_ticket()
             )
 
         del ROOMS[code]
 
-        st.session_state.room_code = new_room
+        st.session_state.room_code = new_code
 
         st.rerun()
 
@@ -1371,6 +1355,10 @@ def player_room():
             "Room no longer exists."
         )
 
+        if st.button("Return Home"):
+
+            return_home()
+
         return
 
     room = ROOMS[code]
@@ -1378,7 +1366,7 @@ def player_room():
     player_name = st.session_state.player_name
 
     # --------------------------------------------------------
-    # AUTOMATIC UPDATE
+    # AUTO REFRESH
     # --------------------------------------------------------
 
     st_autorefresh(
@@ -1433,7 +1421,7 @@ def player_room():
             </div>
 
             <div style="
-                font-size:75px;
+                font-size:80px;
                 font-weight:900;
                 line-height:1;
             ">
@@ -1441,7 +1429,7 @@ def player_room():
             </div>
 
             <div style="
-                font-size:22px;
+                font-size:23px;
                 font-weight:bold;
             ">
             {number_word(current)}
@@ -1452,24 +1440,37 @@ def player_room():
             unsafe_allow_html=True
         )
 
+    else:
+
+        st.info(
+            "Waiting for the host to start the game..."
+        )
+
     # --------------------------------------------------------
     # TICKET
     # --------------------------------------------------------
 
     st.divider()
 
-    ticket = room["tickets"][player_name]
-
-    st.markdown(
-        ticket_html(
-            ticket,
-            room["called_numbers"]
-        ),
-        unsafe_allow_html=True
+    ticket = room["tickets"].get(
+        player_name
     )
 
+    if ticket:
+
+        # IMPORTANT:
+        # st.html() renders HTML instead of showing
+        # the HTML source code.
+
+        st.html(
+            ticket_html(
+                ticket,
+                room["called_numbers"]
+            )
+        )
+
     st.caption(
-        "Numbers are automatically marked when the host calls them."
+        "🟢 Called numbers are automatically marked."
     )
 
     # --------------------------------------------------------
@@ -1491,6 +1492,12 @@ def player_room():
             )
         )
 
+    else:
+
+        st.caption(
+            "No numbers have been called yet."
+        )
+
     # --------------------------------------------------------
     # CLAIMS
     # --------------------------------------------------------
@@ -1500,7 +1507,7 @@ def player_room():
     st.subheader("🏆 Make a Claim")
 
     st.caption(
-        "The server will automatically verify your ticket."
+        "The server automatically checks your ticket."
     )
 
     claim_types = [
@@ -1523,7 +1530,7 @@ def player_room():
             if st.button(
                 f"🏆 {claim_type}",
                 use_container_width=True,
-                key=f"claim_{claim_type}_{code}"
+                key=f"{code}_{claim_type}"
             ):
 
                 make_claim(
@@ -1535,7 +1542,7 @@ def player_room():
                 st.rerun()
 
     # --------------------------------------------------------
-    # CLAIM STATUS
+    # MY CLAIMS
     # --------------------------------------------------------
 
     my_claims = [
@@ -1561,7 +1568,7 @@ def player_room():
             else:
 
                 st.error(
-                    f"❌ {claim['type']} — NOT YET COMPLETE"
+                    f"❌ {claim['type']} — NOT COMPLETE"
                 )
 
 
