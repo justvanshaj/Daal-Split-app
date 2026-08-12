@@ -1,9 +1,11 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import chess
-import chess.svg
 import random
 import string
 import time
+import html
+
 from streamlit_autorefresh import st_autorefresh
 
 
@@ -19,7 +21,7 @@ st.set_page_config(
 
 
 # ============================================================
-# SHARED SERVER-SIDE ROOM STORAGE
+# SHARED SERVER MEMORY
 # ============================================================
 
 @st.cache_resource
@@ -31,47 +33,23 @@ GAME_ROOMS = get_game_rooms()
 
 
 # ============================================================
-# ROOM CLEANUP
-# ============================================================
-
-def cleanup_rooms():
-
-    current_time = time.time()
-
-    expired_rooms = []
-
-    for code, room in GAME_ROOMS.items():
-
-        # Delete rooms older than 6 hours
-        if current_time - room["created_at"] > 21600:
-            expired_rooms.append(code)
-
-    for code in expired_rooms:
-        del GAME_ROOMS[code]
-
-
-cleanup_rooms()
-
-
-# ============================================================
 # SESSION STATE
 # ============================================================
 
-if "screen" not in st.session_state:
-    st.session_state.screen = "welcome"
+defaults = {
+    "screen": "welcome",
+    "room_code": None,
+    "player_name": None,
+    "player_role": None,
+}
 
-if "room_code" not in st.session_state:
-    st.session_state.room_code = None
-
-if "player_name" not in st.session_state:
-    st.session_state.player_name = None
-
-if "player_role" not in st.session_state:
-    st.session_state.player_role = None
+for key, value in defaults.items():
+    if key not in st.session_state:
+        st.session_state[key] = value
 
 
 # ============================================================
-# GENERATE ROOM CODE
+# ROOM CODE
 # ============================================================
 
 def generate_room_code():
@@ -81,10 +59,7 @@ def generate_room_code():
     while True:
 
         code = "".join(
-            random.choices(
-                characters,
-                k=6
-            )
+            random.choices(characters, k=6)
         )
 
         if code not in GAME_ROOMS:
@@ -97,32 +72,30 @@ def generate_room_code():
 
 def create_room(host_name):
 
-    room_code = generate_room_code()
+    code = generate_room_code()
 
-    GAME_ROOMS[room_code] = {
-
+    GAME_ROOMS[code] = {
         "host": host_name,
-
         "player": None,
 
         "board": chess.Board(),
 
         "created_at": time.time(),
-
         "last_activity": time.time(),
 
         "game_over": False,
-
         "winner": None,
+        "draw_reason": None,
 
         "resigned_by": None,
 
         "last_move": None,
+        "move_number": 0,
 
-        "move_number": 0
+        "version": 0,
     }
 
-    return room_code
+    return code
 
 
 # ============================================================
@@ -134,37 +107,58 @@ def reset_game(room):
     room["board"] = chess.Board()
 
     room["game_over"] = False
-
     room["winner"] = None
+    room["draw_reason"] = None
 
     room["resigned_by"] = None
 
     room["last_move"] = None
-
     room["move_number"] = 0
 
     room["last_activity"] = time.time()
 
+    room["version"] += 1
+
 
 # ============================================================
-# RETURN HOME
+# CLEAN OLD ROOMS
+# ============================================================
+
+def cleanup_rooms():
+
+    now = time.time()
+
+    expired = []
+
+    for code, room in GAME_ROOMS.items():
+
+        if now - room["last_activity"] > 21600:
+            expired.append(code)
+
+    for code in expired:
+
+        del GAME_ROOMS[code]
+
+
+cleanup_rooms()
+
+
+# ============================================================
+# HOME
 # ============================================================
 
 def return_home():
 
     st.session_state.screen = "welcome"
-
     st.session_state.room_code = None
-
     st.session_state.player_name = None
-
     st.session_state.player_role = None
 
     st.rerun()
 
 
 # ============================================================
-# WELCOME SCREEN
+# WELCOME
 # ============================================================
 
 def welcome_screen():
@@ -179,13 +173,13 @@ def welcome_screen():
         No login.  
         No registration.
 
-        Create a private room and share the code with your opponent.
+        Create a private room and share the code.
         """
     )
 
     st.divider()
 
-    st.subheader("How do you want to play?")
+    st.subheader("Choose how you want to play")
 
     col1, col2 = st.columns(2)
 
@@ -194,13 +188,13 @@ def welcome_screen():
         st.markdown("### 👑 Host")
 
         st.write(
-            "Create a private room and invite another player."
+            "Create a private room."
         )
 
         if st.button(
             "Create Room",
-            use_container_width=True,
-            type="primary"
+            type="primary",
+            use_container_width=True
         ):
 
             st.session_state.screen = "host"
@@ -212,7 +206,7 @@ def welcome_screen():
         st.markdown("### ♟️ Player")
 
         st.write(
-            "Join an existing room using its code."
+            "Join a room using a room code."
         )
 
         if st.button(
@@ -253,14 +247,11 @@ def host_screen():
 
             return
 
-        room_code = create_room(name)
+        code = create_room(name)
 
         st.session_state.player_name = name
-
         st.session_state.player_role = "host"
-
-        st.session_state.room_code = room_code
-
+        st.session_state.room_code = code
         st.session_state.screen = "waiting"
 
         st.rerun()
@@ -278,79 +269,57 @@ def host_screen():
 
 def waiting_screen():
 
-    room_code = st.session_state.room_code
+    code = st.session_state.room_code
 
-    if not room_code:
+    if not code or code not in GAME_ROOMS:
 
-        return_home()
-
-        return
-
-    if room_code not in GAME_ROOMS:
-
-        st.error(
-            "This room no longer exists."
-        )
+        st.error("This room no longer exists.")
 
         if st.button(
             "Return Home",
             use_container_width=True
         ):
-
             return_home()
 
         return
 
-    room = GAME_ROOMS[room_code]
+    room = GAME_ROOMS[code]
 
     room["last_activity"] = time.time()
 
-    st.title("♟️ Waiting for Opponent")
+    st.title("♟️ Your Private Room")
 
-    st.success(
-        "Your private chess room is ready!"
-    )
+    st.success("Room created successfully!")
 
-    st.markdown("### Room Code")
+    st.subheader("Share this code")
 
-    st.code(
-        room_code,
-        language=None
-    )
-
-    st.markdown(
-        "Share this code with your opponent."
-    )
+    st.code(code)
 
     st.info(
         "Your opponent should choose "
         "**Player → Join Room** and enter this code."
     )
 
-    st.divider()
-
-    st.markdown(
-        f"**Host:** {room['host']}"
+    st.write(
+        f"👑 Host: **{room['host']}**"
     )
 
     if room["player"] is None:
 
         st.warning(
-            "Waiting for opponent to join..."
+            "Waiting for your opponent..."
         )
 
         st_autorefresh(
             interval=1000,
-            key="waiting_room_refresh"
+            key="waiting_refresh"
         )
 
     else:
 
         st.success(
-            f"Opponent joined: {room['player']}"
+            f"♟️ {room['player']} joined!"
         )
-
-        time.sleep(0.5)
 
         st.session_state.screen = "game"
 
@@ -363,15 +332,14 @@ def waiting_screen():
         use_container_width=True
     ):
 
-        if room_code in GAME_ROOMS:
-
-            del GAME_ROOMS[room_code]
+        if code in GAME_ROOMS:
+            del GAME_ROOMS[code]
 
         return_home()
 
 
 # ============================================================
-# PLAYER JOIN SCREEN
+# PLAYER SCREEN
 # ============================================================
 
 def player_screen():
@@ -384,7 +352,7 @@ def player_screen():
         placeholder="Enter your name"
     )
 
-    room_code = st.text_input(
+    code = st.text_input(
         "Room code",
         max_chars=6,
         placeholder="Example: A7K92P"
@@ -401,16 +369,14 @@ def player_screen():
         if not name:
 
             st.warning("Please enter your name.")
-
             return
 
-        if not room_code:
+        if not code:
 
             st.warning("Please enter the room code.")
-
             return
 
-        if room_code not in GAME_ROOMS:
+        if code not in GAME_ROOMS:
 
             st.error(
                 "Room not found. Please check the code."
@@ -418,7 +384,7 @@ def player_screen():
 
             return
 
-        room = GAME_ROOMS[room_code]
+        room = GAME_ROOMS[code]
 
         if room["player"] is not None:
 
@@ -431,21 +397,18 @@ def player_screen():
         if name.lower() == room["host"].lower():
 
             st.error(
-                "Please use a different name from the host."
+                "Please choose a different name."
             )
 
             return
 
         room["player"] = name
-
         room["last_activity"] = time.time()
+        room["version"] += 1
 
         st.session_state.player_name = name
-
         st.session_state.player_role = "player"
-
-        st.session_state.room_code = room_code
-
+        st.session_state.room_code = code
         st.session_state.screen = "game"
 
         st.rerun()
@@ -458,50 +421,518 @@ def player_screen():
 
 
 # ============================================================
-# BOARD DISPLAY
+# CHESS PIECES
 # ============================================================
 
-def display_board(room):
+PIECES = {
+    "P": "♙",
+    "N": "♘",
+    "B": "♗",
+    "R": "♖",
+    "Q": "♕",
+    "K": "♔",
+
+    "p": "♟",
+    "n": "♞",
+    "b": "♝",
+    "r": "♜",
+    "q": "♛",
+    "k": "♚",
+}
+
+
+# ============================================================
+# BOARD DATA
+# ============================================================
+
+def board_to_data(board):
+
+    data = []
+
+    for rank in range(7, -1, -1):
+
+        row = []
+
+        for file in range(8):
+
+            square = chess.square(file, rank)
+
+            piece = board.piece_at(square)
+
+            if piece:
+
+                row.append({
+                    "square": chess.square_name(square),
+                    "piece": PIECES[piece.symbol()],
+                    "color": "white" if piece.color else "black",
+                })
+
+            else:
+
+                row.append({
+                    "square": chess.square_name(square),
+                    "piece": "",
+                    "color": "",
+                })
+
+        data.append(row)
+
+    return data
+
+
+# ============================================================
+# INTERACTIVE CHESSBOARD
+# ============================================================
+
+def interactive_board(room):
 
     board = room["board"]
 
-    if st.session_state.player_role == "player":
+    if st.session_state.player_role == "host":
 
-        orientation = chess.BLACK
+        orientation = "white"
 
     else:
 
-        orientation = chess.WHITE
+        orientation = "black"
 
-    board_svg = chess.svg.board(
-        board=board,
-        orientation=orientation,
-        size=650
+    board_data = board_to_data(board)
+
+    board_json = str(board_data)
+
+    # Convert Python representation to safe JS data
+    import json
+
+    board_json = json.dumps(board_data)
+
+    component_code = f"""
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="UTF-8">
+
+<style>
+
+* {{
+    box-sizing: border-box;
+}}
+
+body {{
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    font-family: Arial, sans-serif;
+}}
+
+.board-wrapper {{
+    width: min(92vw, 620px);
+    margin: auto;
+}}
+
+.board {{
+    width: 100%;
+    aspect-ratio: 1 / 1;
+
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+
+    border-radius: 8px;
+    overflow: hidden;
+
+    box-shadow:
+        0 4px 18px rgba(0,0,0,0.20);
+}}
+
+.square {{
+    position: relative;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    cursor: pointer;
+
+    user-select: none;
+
+    font-size: clamp(32px, 8vw, 68px);
+
+    transition: filter 0.1s;
+}}
+
+.square:hover {{
+    filter: brightness(1.08);
+}}
+
+.light {{
+    background: #f0d9b5;
+}}
+
+.dark {{
+    background: #b58863;
+}}
+
+.selected {{
+    box-shadow:
+        inset 0 0 0 5px #ffd54f;
+}}
+
+.possible {{
+    box-shadow:
+        inset 0 0 0 5px rgba(60, 180, 75, 0.8);
+}}
+
+.possible::after {{
+    content: "";
+    position: absolute;
+
+    width: 24%;
+    height: 24%;
+
+    border-radius: 50%;
+
+    background: rgba(40, 160, 70, 0.75);
+}}
+
+.capture {{
+    box-shadow:
+        inset 0 0 0 5px rgba(220, 60, 60, 0.9);
+}}
+
+.rank {{
+    position: absolute;
+    top: 3px;
+    left: 5px;
+
+    font-size: 12px;
+    font-weight: bold;
+
+    opacity: 0.65;
+}}
+
+.file {{
+    position: absolute;
+    bottom: 2px;
+    right: 5px;
+
+    font-size: 12px;
+    font-weight: bold;
+
+    opacity: 0.65;
+}}
+
+.white-piece {{
+    color: #ffffff;
+
+    text-shadow:
+        0 2px 2px #000,
+        0 0 2px #000;
+}}
+
+.black-piece {{
+    color: #111111;
+
+    text-shadow:
+        0 1px 1px rgba(255,255,255,0.5);
+}}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="board-wrapper">
+
+<div id="board" class="board"></div>
+
+</div>
+
+<script>
+
+const boardData = {board_json};
+
+const orientation = "{orientation}";
+
+let selectedSquare = null;
+
+let possibleSquares = [];
+
+const files = ["a","b","c","d","e","f","g","h"];
+
+const ranks = ["8","7","6","5","4","3","2","1"];
+
+function findSquare(square) {{
+
+    for (const row of boardData) {{
+
+        for (const cell of row) {{
+
+            if (cell.square === square) {{
+                return cell;
+            }}
+
+        }}
+
+    }}
+
+    return null;
+}}
+
+function renderBoard() {{
+
+    const board = document.getElementById("board");
+
+    board.innerHTML = "";
+
+    let displayFiles = [...files];
+
+    let displayRanks = [...ranks];
+
+    if (orientation === "black") {{
+
+        displayFiles.reverse();
+        displayRanks.reverse();
+
+    }}
+
+    for (let rankIndex = 0; rankIndex < 8; rankIndex++) {{
+
+        for (let fileIndex = 0; fileIndex < 8; fileIndex++) {{
+
+            const file = displayFiles[fileIndex];
+
+            const rank = displayRanks[rankIndex];
+
+            const squareName = file + rank;
+
+            const fileNumber = files.indexOf(file);
+
+            const rankNumber = parseInt(rank);
+
+            const isLight =
+                (fileNumber + rankNumber) % 2 === 1;
+
+            const square = document.createElement("div");
+
+            square.className =
+                "square " +
+                (isLight ? "light" : "dark");
+
+            if (selectedSquare === squareName) {{
+                square.classList.add("selected");
+            }}
+
+            if (possibleSquares.includes(squareName)) {{
+
+                const target = findSquare(squareName);
+
+                if (target && target.piece) {{
+                    square.classList.add("capture");
+                }} else {{
+                    square.classList.add("possible");
+                }}
+
+            }}
+
+            const cell = findSquare(squareName);
+
+            if (cell && cell.piece) {{
+
+                const piece = document.createElement("div");
+
+                piece.textContent = cell.piece;
+
+                piece.className =
+                    cell.color === "white"
+                    ? "white-piece"
+                    : "black-piece";
+
+                square.appendChild(piece);
+
+            }}
+
+            if (fileIndex === 0) {{
+
+                const rankLabel =
+                    document.createElement("span");
+
+                rankLabel.className = "rank";
+
+                rankLabel.textContent = rank;
+
+                square.appendChild(rankLabel);
+
+            }}
+
+            if (rankIndex === 7) {{
+
+                const fileLabel =
+                    document.createElement("span");
+
+                fileLabel.className = "file";
+
+                fileLabel.textContent = file;
+
+                square.appendChild(fileLabel);
+
+            }}
+
+            square.onclick = () => handleClick(squareName);
+
+            board.appendChild(square);
+        }}
+
+    }}
+
+}}
+
+function handleClick(square) {{
+
+    // First click
+    if (selectedSquare === null) {{
+
+        const cell = findSquare(square);
+
+        if (!cell || !cell.piece) {{
+            return;
+        }}
+
+        selectedSquare = square;
+
+        // We don't know legal moves in browser.
+        // Python will validate the attempted move.
+        possibleSquares = [];
+
+        renderBoard();
+
+        // Send selection to Python
+        window.parent.postMessage(
+            {{
+                type: "streamlit:setComponentValue",
+                value: "select:" + square
+            }},
+            "*"
+        );
+
+        return;
+    }}
+
+    // Second click
+    const move =
+        selectedSquare + square;
+
+    window.parent.postMessage(
+        {{
+            type: "streamlit:setComponentValue",
+            value: "move:" + move
+        }},
+        "*"
+    );
+
+    selectedSquare = null;
+
+    possibleSquares = [];
+
+    renderBoard();
+
+}}
+
+renderBoard();
+
+</script>
+
+</body>
+
+</html>
+"""
+
+    result = components.html(
+        component_code,
+        height=650,
+        scrolling=False
     )
 
-    st.image(
-        board_svg,
-        use_container_width=True
-    )
+    return result
+
+
+# ============================================================
+# APPLY MOVE
+# ============================================================
+
+def apply_move(room, move_text):
+
+    board = room["board"]
+
+    try:
+
+        move = chess.Move.from_uci(move_text)
+
+    except ValueError:
+
+        return False
+
+    # Illegal move = simply ignore it.
+    if move not in board.legal_moves:
+
+        return False
+
+    board.push(move)
+
+    room["last_move"] = move_text
+    room["move_number"] += 1
+    room["last_activity"] = time.time()
+    room["version"] += 1
+
+    # Checkmate
+    if board.is_checkmate():
+
+        room["game_over"] = True
+
+        if board.turn == chess.WHITE:
+            room["winner"] = room["player"]
+        else:
+            room["winner"] = room["host"]
+
+    # Draw
+    elif board.is_stalemate():
+
+        room["game_over"] = True
+        room["draw_reason"] = "Stalemate"
+
+    elif board.is_insufficient_material():
+
+        room["game_over"] = True
+        room["draw_reason"] = "Insufficient material"
+
+    elif board.is_seventyfive_moves():
+
+        room["game_over"] = True
+        room["draw_reason"] = "75-move rule"
+
+    elif board.is_fivefold_repetition():
+
+        room["game_over"] = True
+        room["draw_reason"] = "Fivefold repetition"
+
+    return True
 
 
 # ============================================================
 # MOVE HISTORY
 # ============================================================
 
-def get_move_history(board):
-
-    if not board.move_stack:
-
-        return []
-
-    temp_board = chess.Board()
+def get_history(board):
 
     history = []
 
+    temp = chess.Board()
+
     for index, move in enumerate(board.move_stack):
 
-        san = temp_board.san(move)
+        san = temp.san(move)
 
         move_number = index // 2 + 1
 
@@ -515,55 +946,9 @@ def get_move_history(board):
 
             history[-1] += f" {san}"
 
-        temp_board.push(move)
+        temp.push(move)
 
     return history
-
-
-# ============================================================
-# GAME RESULT CHECK
-# ============================================================
-
-def update_game_result(room):
-
-    board = room["board"]
-
-    if board.is_checkmate():
-
-        room["game_over"] = True
-
-        # Board turn is the player who is checkmated
-        if board.turn == chess.WHITE:
-
-            room["winner"] = room["player"]
-
-        else:
-
-            room["winner"] = room["host"]
-
-    elif board.is_stalemate():
-
-        room["game_over"] = True
-
-        room["winner"] = None
-
-    elif board.is_insufficient_material():
-
-        room["game_over"] = True
-
-        room["winner"] = None
-
-    elif board.is_fivefold_repetition():
-
-        room["game_over"] = True
-
-        room["winner"] = None
-
-    elif board.is_seventyfive_moves():
-
-        room["game_over"] = True
-
-        room["winner"] = None
 
 
 # ============================================================
@@ -572,15 +957,9 @@ def update_game_result(room):
 
 def game_screen():
 
-    room_code = st.session_state.room_code
+    code = st.session_state.room_code
 
-    if not room_code:
-
-        return_home()
-
-        return
-
-    if room_code not in GAME_ROOMS:
+    if not code or code not in GAME_ROOMS:
 
         st.error(
             "Room no longer exists."
@@ -595,7 +974,7 @@ def game_screen():
 
         return
 
-    room = GAME_ROOMS[room_code]
+    room = GAME_ROOMS[code]
 
     room["last_activity"] = time.time()
 
@@ -603,21 +982,13 @@ def game_screen():
 
     my_name = st.session_state.player_name
 
-    # --------------------------------------------------------
-    # COLORS
-    # --------------------------------------------------------
-
     if st.session_state.player_role == "host":
 
         my_color = chess.WHITE
 
-        opponent_name = room["player"]
-
     else:
 
         my_color = chess.BLACK
-
-        opponent_name = room["host"]
 
     # --------------------------------------------------------
     # HEADER
@@ -637,25 +1008,17 @@ def game_screen():
 
     with col2:
 
-        if room["player"]:
-
-            st.markdown(
-                f"### ♚ {room['player']}"
-            )
-
-        else:
-
-            st.markdown(
-                "### ♚ Waiting..."
-            )
+        st.markdown(
+            f"### ♚ {room['player']}"
+        )
 
         st.caption("BLACK")
 
-    st.divider()
+    # --------------------------------------------------------
+    # STATUS
+    # --------------------------------------------------------
 
-    # --------------------------------------------------------
-    # GAME STATUS
-    # --------------------------------------------------------
+    st.divider()
 
     if room["game_over"]:
 
@@ -682,7 +1045,7 @@ def game_screen():
         else:
 
             st.info(
-                "🤝 Game drawn!"
+                f"🤝 Draw — {room['draw_reason']}"
             )
 
     else:
@@ -698,117 +1061,54 @@ def game_screen():
         if turn_name == my_name:
 
             st.success(
-                "🟢 Your turn"
+                "🟢 Your turn — click a piece, then click where you want to move it."
             )
 
         else:
 
-            st.warning(
-                f"🟡 Waiting for {turn_name}"
+            st.info(
+                f"🟡 Waiting for {turn_name}..."
             )
 
         if board.is_check():
 
-            st.error(
-                "⚠️ CHECK!"
+            st.warning(
+                "⚠️ Check!"
             )
 
     # --------------------------------------------------------
-    # BOARD
+    # INTERACTIVE BOARD
     # --------------------------------------------------------
 
-    display_board(room)
+    result = interactive_board(room)
 
     # --------------------------------------------------------
-    # MOVE INPUT
+    # PROCESS CLICK
     # --------------------------------------------------------
 
-    if not room["game_over"]:
+    if result:
 
-        st.subheader("Make Your Move")
+        if isinstance(result, str):
 
-        move_input = st.text_input(
-            "Move",
-            placeholder="Example: e2e4",
-            key=f"move_input_{room_code}_{room['move_number']}"
-        )
+            if result.startswith("move:"):
 
-        st.caption(
-            "Enter moves using coordinates, e.g. e2e4 or g1f3."
-        )
-
-        if st.button(
-            "Make Move",
-            type="primary",
-            use_container_width=True
-        ):
-
-            # Check whether player has joined
-            if room["player"] is None:
-
-                st.warning(
-                    "Waiting for an opponent."
+                move_text = result.replace(
+                    "move:",
+                    "",
+                    1
                 )
 
-                return
+                # Only allow the correct player to move
+                if not room["game_over"]:
 
-            # Check turn
-            if board.turn != my_color:
+                    if board.turn == my_color:
 
-                st.error(
-                    "It is not your turn."
-                )
+                        apply_move(
+                            room,
+                            move_text
+                        )
 
-                return
-
-            move_input = move_input.strip().lower()
-
-            # ------------------------------------------------
-            # PARSE MOVE
-            # ------------------------------------------------
-
-            try:
-
-                move = chess.Move.from_uci(
-                    move_input
-                )
-
-            except ValueError:
-
-                st.error(
-                    "Invalid move format. "
-                    "Example: e2e4"
-                )
-
-                return
-
-            # ------------------------------------------------
-            # LEGAL MOVE
-            # ------------------------------------------------
-
-            if move not in board.legal_moves:
-
-                st.error(
-                    "That is not a legal chess move."
-                )
-
-                return
-
-            # ------------------------------------------------
-            # MAKE MOVE
-            # ------------------------------------------------
-
-            board.push(move)
-
-            room["last_move"] = move_input
-
-            room["move_number"] += 1
-
-            room["last_activity"] = time.time()
-
-            update_game_result(room)
-
-            st.rerun()
+                        st.rerun()
 
     # --------------------------------------------------------
     # MOVE HISTORY
@@ -816,9 +1116,9 @@ def game_screen():
 
     st.divider()
 
-    st.subheader("📜 Move History")
+    st.subheader("📜 Moves")
 
-    history = get_move_history(board)
+    history = get_history(board)
 
     if history:
 
@@ -829,55 +1129,49 @@ def game_screen():
     else:
 
         st.caption(
-            "No moves have been played yet."
+            "The game has not started yet."
         )
 
     # --------------------------------------------------------
-    # GAME CONTROLS
+    # CONTROLS
     # --------------------------------------------------------
 
     st.divider()
 
-    col1, col2 = st.columns(2)
+    if not room["game_over"]:
 
-    with col1:
+        if st.button(
+            "🏳️ Resign",
+            use_container_width=True
+        ):
 
-        if not room["game_over"]:
+            room["game_over"] = True
+            room["resigned_by"] = my_name
+            room["last_activity"] = time.time()
+            room["version"] += 1
 
-            if st.button(
-                "🏳️ Resign",
-                use_container_width=True
-            ):
+            st.rerun()
 
-                room["game_over"] = True
+    else:
 
-                room["resigned_by"] = my_name
+        if st.button(
+            "🔄 Rematch",
+            type="primary",
+            use_container_width=True
+        ):
 
-                room["last_activity"] = time.time()
+            reset_game(room)
 
-                st.rerun()
-
-    with col2:
-
-        if room["game_over"]:
-
-            if st.button(
-                "🔄 Rematch",
-                use_container_width=True
-            ):
-
-                reset_game(room)
-
-                st.rerun()
+            st.rerun()
 
     # --------------------------------------------------------
-    # ROOM INFO
+    # ROOM INFORMATION
     # --------------------------------------------------------
 
     st.divider()
 
     st.caption(
-        f"Room: {room_code}"
+        f"Room: {code}"
     )
 
     st.caption(
@@ -885,7 +1179,7 @@ def game_screen():
     )
 
     # --------------------------------------------------------
-    # LEAVE GAME
+    # LEAVE
     # --------------------------------------------------------
 
     if st.button(
@@ -893,19 +1187,18 @@ def game_screen():
         use_container_width=True
     ):
 
-        # Host leaving destroys the room
         if st.session_state.player_role == "host":
 
-            if room_code in GAME_ROOMS:
+            if code in GAME_ROOMS:
 
-                del GAME_ROOMS[room_code]
+                del GAME_ROOMS[code]
 
         else:
 
-            # Player leaving only removes player
-            if room_code in GAME_ROOMS:
+            if code in GAME_ROOMS:
 
-                GAME_ROOMS[room_code]["player"] = None
+                GAME_ROOMS[code]["player"] = None
+                GAME_ROOMS[code]["version"] += 1
 
         return_home()
 
@@ -915,12 +1208,12 @@ def game_screen():
 
     st_autorefresh(
         interval=1000,
-        key=f"game_refresh_{room_code}"
+        key=f"game_refresh_{code}"
     )
 
 
 # ============================================================
-# APPLICATION ROUTER
+# ROUTER
 # ============================================================
 
 if st.session_state.screen == "welcome":
